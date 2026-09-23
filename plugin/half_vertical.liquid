@@ -1,10 +1,10 @@
-<div class="layout layout--col gap--space-between">
+<div class="layout layout--col gap--space-between lg:gap--medium portrait:gap--small">
   <div class="flex flex--col gap--tiny">
-    <span class="title title--medium">{{ team_name | default: "MLS Team" }}</span>
+    <span class="title title--medium lg:title--large">{{ team_name | default: "MLS Team" }}</span>
     <span class="label label--small">{{ conference | default: "MLS" }} #{{ standing | default: "-" }} • {{ points | default: "0" }} pts</span>
   </div>
 
-  <div class="flex gap--medium">
+  <div class="flex gap--medium lg:gap--large portrait:gap--small">
     <div class="item"><div class="meta"></div><div class="content"><span class="value">{{ wins | default: "0" }}</span><span class="label">W</span></div></div>
     <div class="item"><div class="meta"></div><div class="content"><span class="value">{{ draws | default: "0" }}</span><span class="label">D</span></div></div>
     <div class="item"><div class="meta"></div><div class="content"><span class="value">{{ losses | default: "0" }}</span><span class="label">L</span></div></div>

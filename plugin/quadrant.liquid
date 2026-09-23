@@ -1,6 +1,6 @@
-<div class="layout layout--col gap--space-between">
+<div class="layout layout--col gap--space-between lg:gap--medium portrait:gap--tiny">
   <div class="flex flex--col gap--tiny">
-    <span class="title title--small">{{ team_name | default: "MLS Team" }}</span>
+    <span class="title title--small lg:title--medium">{{ team_name | default: "MLS Team" }}</span>
     <span class="label label--small">#{{ standing | default: "-" }} • {{ points | default: "0" }} pts • {{ wins | default: "0" }}W-{{ draws | default: "0" }}D-{{ losses | default: "0" }}L</span>
   </div>
 
