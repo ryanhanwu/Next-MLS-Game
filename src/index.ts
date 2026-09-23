@@ -1,48 +1,54 @@
 /**
  * TRMNL MLS Plugin — Cloudflare Worker
  *
- * GET /mls?team={espn_team_id}
+ * GET /mls?team={team_name_or_id}
  *
- * Uses sports.core.api.espn.com which works from Cloudflare IPs.
- * site.api.espn.com returns 403 from datacenter IPs.
+ * Returns MLS team stats, conference standing, and upcoming fixtures
+ * formatted for TRMNL polling plugins.
  */
 
 const CORE = "https://sports.core.api.espn.com/v2/sports/soccer/leagues/usa.1";
 
-const MLS_TEAMS: Record<string, string> = {
-  "Atlanta United FC": "18418",
-  "Austin FC": "20906",
-  "CF Montréal": "9720",
-  "Charlotte FC": "21300",
-  "Chicago Fire FC": "182",
-  "Colorado Rapids": "184",
-  "Columbus Crew": "183",
-  "D.C. United": "193",
-  "FC Cincinnati": "18267",
-  "FC Dallas": "185",
-  "Houston Dynamo FC": "6077",
-  "Inter Miami CF": "20232",
-  "LA Galaxy": "187",
-  "LAFC": "18966",
-  "Minnesota United FC": "17362",
-  "Nashville SC": "18986",
-  "New England Revolution": "189",
-  "New York City FC": "17606",
-  "New York Red Bulls": "190",
-  "Orlando City SC": "12011",
-  "Philadelphia Union": "10739",
-  "Portland Timbers": "9723",
-  "Real Salt Lake": "4771",
-  "San Diego FC": "22529",
-  "San Jose Earthquakes": "191",
-  "Seattle Sounders FC": "9726",
-  "Sporting Kansas City": "186",
-  "St. Louis CITY SC": "21812",
-  "Toronto FC": "7318",
-  "Vancouver Whitecaps": "9727",
+interface TeamMeta {
+  name: string;
+  abbr: string;
+  conf: "East" | "West";
+}
+
+const MLS_TEAMS_DATA: Record<string, TeamMeta> = {
+  "18418": { name: "Atlanta United FC", abbr: "ATL", conf: "East" },
+  "20906": { name: "Austin FC", abbr: "ATX", conf: "West" },
+  "9720":  { name: "CF Montréal", abbr: "MTL", conf: "East" },
+  "21300": { name: "Charlotte FC", abbr: "CLT", conf: "East" },
+  "182":   { name: "Chicago Fire FC", abbr: "CHI", conf: "East" },
+  "184":   { name: "Colorado Rapids", abbr: "COL", conf: "West" },
+  "183":   { name: "Columbus Crew", abbr: "CLB", conf: "East" },
+  "193":   { name: "D.C. United", abbr: "DC", conf: "East" },
+  "18267": { name: "FC Cincinnati", abbr: "CIN", conf: "East" },
+  "185":   { name: "FC Dallas", abbr: "DAL", conf: "West" },
+  "6077":  { name: "Houston Dynamo FC", abbr: "HOU", conf: "West" },
+  "20232": { name: "Inter Miami CF", abbr: "MIA", conf: "East" },
+  "187":   { name: "LA Galaxy", abbr: "LA", conf: "West" },
+  "18966": { name: "LAFC", abbr: "LAFC", conf: "West" },
+  "17362": { name: "Minnesota United FC", abbr: "MIN", conf: "West" },
+  "18986": { name: "Nashville SC", abbr: "NSH", conf: "East" },
+  "189":   { name: "New England Revolution", abbr: "NE", conf: "East" },
+  "17606": { name: "New York City FC", abbr: "NYC", conf: "East" },
+  "190":   { name: "New York Red Bulls", abbr: "RBNY", conf: "East" },
+  "12011": { name: "Orlando City SC", abbr: "ORL", conf: "East" },
+  "10739": { name: "Philadelphia Union", abbr: "PHI", conf: "East" },
+  "9723":  { name: "Portland Timbers", abbr: "POR", conf: "West" },
+  "4771":  { name: "Real Salt Lake", abbr: "RSL", conf: "West" },
+  "22529": { name: "San Diego FC", abbr: "SD", conf: "West" },
+  "191":   { name: "San Jose Earthquakes", abbr: "SJ", conf: "West" },
+  "9726":  { name: "Seattle Sounders FC", abbr: "SEA", conf: "West" },
+  "186":   { name: "Sporting Kansas City", abbr: "SKC", conf: "West" },
+  "21812": { name: "St. Louis CITY SC", abbr: "STL", conf: "West" },
+  "7318":  { name: "Toronto FC", abbr: "TOR", conf: "East" },
+  "9727":  { name: "Vancouver Whitecaps", abbr: "VAN", conf: "West" },
 };
 
-const DEFAULT_TEAM_ID = "20232"; // Inter Miami CF default
+const DEFAULT_TEAM_ID = "20232"; // Inter Miami CF
 
 function resolveTeamId(param: string | null): string {
   if (!param) return DEFAULT_TEAM_ID;
@@ -50,24 +56,23 @@ function resolveTeamId(param: string | null): string {
   if (!trimmed || trimmed.includes("{{") || trimmed.includes("}}")) {
     return DEFAULT_TEAM_ID;
   }
-  if (/^\d+$/.test(trimmed)) return trimmed;
-  const match = Object.entries(MLS_TEAMS).find(
-    ([name]) => name.toLowerCase() === trimmed.toLowerCase()
+  if (/^\d+$/.test(trimmed) && MLS_TEAMS_DATA[trimmed]) {
+    return trimmed;
+  }
+  const match = Object.entries(MLS_TEAMS_DATA).find(
+    ([, meta]) => meta.name.toLowerCase() === trimmed.toLowerCase()
   );
-  if (match) return match[1];
+  if (match) return match[0];
   return DEFAULT_TEAM_ID;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Fetch JSON, throwing on non-2xx */
 async function get<T>(url: string): Promise<T> {
-  // ESPN core API uses http:// in $ref links — upgrade to https
   const safeUrl = url.replace(/^http:\/\//, "https://");
   const res = await fetch(safeUrl, {
     headers: {
-      "User-Agent":
-        "Mozilla/5.0 (compatible; TRMNL-MLS-Plugin/1.0)",
+      "User-Agent": "Mozilla/5.0 (compatible; TRMNL-MLS-Plugin/1.0)",
     },
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${safeUrl}`);
@@ -104,199 +109,124 @@ function formatUpdatedAt(): string {
   });
 }
 
-// ── ESPN Fetchers ─────────────────────────────────────────────────────────────
+// ── Data Fetcher ──────────────────────────────────────────────────────────────
 
-async function fetchTeamInfo(teamId: string) {
-  const data = await get<any>(
-    `${CORE}/teams/${teamId}?lang=en&region=us`
-  );
-  return {
-    name: data.displayName as string,
-    abbr: data.abbreviation as string,
+async function getTeamData(teamId: string) {
+  const teamMeta = MLS_TEAMS_DATA[teamId] || {
+    name: "Unknown FC",
+    abbr: "MLS",
+    conf: "East" as const,
   };
-}
+  const groupId = teamMeta.conf === "West" ? "2" : "1";
+  const currentYear = new Date().getFullYear();
 
-async function fetchRecord(teamId: string) {
-  // type 1 = regular season record (works for current season)
-  const year = new Date().getFullYear();
-  const data = await get<any>(
-    `${CORE}/seasons/${year}/types/1/teams/${teamId}/record?lang=en&region=us`
-  );
-  const total = (data.items ?? []).find((i: any) => i.type === "total");
-  const stats = Object.fromEntries(
-    (total?.stats ?? []).map((s: any) => [s.name, s.displayValue])
-  );
-  return {
-    record: total?.summary ?? "?",
-    wins: stats.wins ?? "?",
-    losses: stats.losses ?? "?",
-    draws: stats.ties ?? "?",
-    points: stats.points ?? "?",
-  };
-}
+  let rank = "?";
+  let points = "?";
+  let wins = "?";
+  let losses = "?";
+  let draws = "?";
+  let record = "?";
 
-async function fetchStandings(teamId: string) {
-  // Fetch all events to find standing — use the team events list
-  // The core API embeds record + groups on each competitor
-  // Instead, walk all events to find the team's group standing
-  // Simpler: re-use the record endpoint which contains points
-  // For position, fetch the scoreboard-style standing from the team's record groups
-
-  // Fetch the team's season record which includes group/conference info
-  const teamData = await get<any>(
-    `${CORE}/teams/${teamId}?lang=en&region=us`
-  );
-
-  // Try to get conference from team's groups
-  const groupsRef: string | undefined = teamData.groups?.["$ref"];
-
-  let conference = "?";
-  let position: number | string = "?";
-
-  if (groupsRef) {
-    try {
-      const groups = await get<any>(groupsRef);
-      const items: any[] = groups.items ?? [];
-      if (items.length > 0) {
-        const groupData = await get<any>(items[0]["$ref"]);
-        conference = (groupData.name as string)
-          .replace(" Conference", "")
-          .replace("Eastern", "East")
-          .replace("Western", "West");
-
-        // Fetch standings for this conference group
-        const standRef: string | undefined = groupData.standings?.["$ref"];
-        if (standRef) {
-          const standData = await get<any>(standRef + "&limit=30");
-          const entries: any[] = standData.entries ?? [];
-          const idx = entries.findIndex(
-            (e: any) => e.team?.id === teamId || e.team?.["$ref"]?.includes(`/teams/${teamId}`)
-          );
-          if (idx !== -1) position = idx + 1;
-        }
+  // 1. Fetch conference standings for position, points, and W/D/L
+  try {
+    const standData = await get<any>(
+      `${CORE}/seasons/${currentYear}/types/1/groups/${groupId}/standings/0?lang=en&region=us`
+    );
+    const standings: any[] = standData.standings ?? [];
+    for (let i = 0; i < standings.length; i++) {
+      const it = standings[i];
+      if (it.team?.["$ref"]?.includes(`/teams/${teamId}`)) {
+        const rec = it.records?.[0];
+        const stats = Object.fromEntries(
+          (rec?.stats ?? []).map((s: any) => [s.name, s.displayValue])
+        );
+        rank = stats.rank ?? String(i + 1);
+        points = stats.points ?? "?";
+        wins = stats.wins ?? "?";
+        losses = stats.losses ?? "?";
+        draws = stats.ties ?? "?";
+        record = rec?.summary ?? `${wins}-${draws}-${losses}`;
+        break;
       }
-    } catch {
-      // non-critical — fall through with defaults
     }
+  } catch (err) {
+    console.error("Standings fetch error:", err);
   }
 
-  return { conference, position };
-}
+  // 2. Fetch events / schedule
+  let lastResult: any = null;
+  const nextGames: any[] = [];
 
-async function fetchSchedule(teamId: string) {
-  const year = new Date().getFullYear();
-
-  // Get paginated events for this team
-  const data = await get<any>(
-    `${CORE}/teams/${teamId}/events?lang=en&region=us&limit=100&season=${year}`
-  );
-
-  const refs: string[] = (data.items ?? []).map((i: any) => i["$ref"]);
-
-  if (refs.length === 0) {
-    return { lastResult: null, nextGames: [] };
-  }
-
-  // Fetch all events in parallel (batched to avoid overload)
-  const batchSize = 20;
-  const events: any[] = [];
-  for (let i = 0; i < refs.length; i += batchSize) {
-    const batch = refs.slice(i, i + batchSize);
-    const results = await Promise.allSettled(batch.map((r) => get<any>(r)));
-    for (const r of results) {
-      if (r.status === "fulfilled") events.push(r.value);
-    }
-  }
-
-  // Sort by date
-  events.sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
-
-  const now = Date.now();
-  const completed = events.filter(
-    (e) =>
-      e.competitions?.[0]?.status?.type?.completed === true ||
-      new Date(e.date).getTime() < now - 2 * 60 * 60 * 1000 // > 2h ago
-  );
-  const upcoming = events.filter(
-    (e) =>
-      !e.competitions?.[0]?.status?.type?.completed &&
-      new Date(e.date).getTime() > now - 60 * 60 * 1000 // not more than 1h ago
-  );
-
-  function parseCompetitor(comp: any, myTeamId: string) {
-    const competitors: any[] = comp.competitors ?? [];
-    const mine = competitors.find(
-      (c) =>
-        c.team?.id === myTeamId ||
-        c.team?.["$ref"]?.includes(`/teams/${myTeamId}`)
+  try {
+    const evData = await get<any>(
+      `${CORE}/teams/${teamId}/events?lang=en&region=us&limit=10&season=${currentYear}`
     );
-    const opp = competitors.find(
-      (c) =>
-        c.team?.id !== myTeamId &&
-        !c.team?.["$ref"]?.includes(`/teams/${myTeamId}`)
-    );
-    return { mine, opp };
-  }
+    const refs: string[] = (evData.items ?? []).map((i: any) => i["$ref"]);
 
-  // Last result
-  let lastResult = null;
-  if (completed.length > 0) {
-    const last = completed[completed.length - 1];
-    const comp = last.competitions?.[0];
-    if (comp) {
-      const { mine, opp } = parseCompetitor(comp, teamId);
-      if (mine && opp) {
-        const oppTeam = opp.team ?? {};
-        const oppName: string =
-          oppTeam.displayName ??
-          oppTeam.shortDisplayName ??
-          oppTeam["$ref"]?.split("/teams/")[1]?.split("?")[0] ??
-          "Unknown";
-        const oppAbbr: string = oppTeam.abbreviation ?? "?";
-        const myScore =
-          typeof mine.score === "object"
-            ? mine.score?.displayValue ?? mine.score?.value?.toString() ?? "?"
-            : mine.score ?? "?";
-        const oppScore =
-          typeof opp.score === "object"
-            ? opp.score?.displayValue ?? opp.score?.value?.toString() ?? "?"
-            : opp.score ?? "?";
-        const myG = parseFloat(myScore);
-        const oppG = parseFloat(oppScore);
-        const outcome = isNaN(myG) || isNaN(oppG) ? "?" : myG > oppG ? "W" : myG < oppG ? "L" : "D";
-        lastResult = {
-          opponent: oppName,
-          opponent_abbr: oppAbbr,
-          score: `${myScore}-${oppScore}`,
-          outcome,
-          date: formatDate(last.date),
-          is_home: mine.homeAway === "home",
+    for (const ref of refs.slice(0, 4)) {
+      try {
+        const ev = await get<any>(ref);
+        const comp = ev.competitions?.[0];
+        const comps: any[] = comp?.competitors ?? [];
+        const myComp = comps.find(
+          (c) => c.id === teamId || c.team?.["$ref"]?.includes(`/teams/${teamId}`)
+        );
+        const oppComp = comps.find(
+          (c) => c.id !== teamId && !c.team?.["$ref"]?.includes(`/teams/${teamId}`)
+        );
+        const opp = (oppComp?.id && MLS_TEAMS_DATA[oppComp.id]) || {
+          name: ev.name ?? "Opponent",
+          abbr: "?",
         };
+
+        const eventTime = new Date(ev.date).getTime();
+        const isCompleted =
+          comp?.status?.type?.completed === true ||
+          eventTime < Date.now() - 3 * 3600 * 1000;
+
+        if (isCompleted && !lastResult) {
+          lastResult = {
+            opponent: opp.name,
+            opponent_abbr: opp.abbr,
+            score: "FT",
+            outcome: myComp?.winner ? "W" : oppComp?.winner ? "L" : "D",
+            date: formatDate(ev.date),
+            is_home: myComp?.homeAway === "home",
+          };
+        } else if (!isCompleted && nextGames.length < 2) {
+          nextGames.push({
+            opponent: opp.name,
+            opponent_abbr: opp.abbr,
+            date: formatDate(ev.date),
+            time: formatTime(ev.date),
+            is_home: myComp?.homeAway === "home",
+          });
+        }
+      } catch (e) {
+        console.error("Event fetch error:", e);
       }
     }
+  } catch (err) {
+    console.error("Events fetch error:", err);
   }
 
-  // Next 2 upcoming
-  const nextGames = upcoming.slice(0, 2).map((e) => {
-    const comp = e.competitions?.[0];
-    const { mine, opp } = parseCompetitor(comp ?? {}, teamId);
-    const oppTeam = opp?.team ?? {};
-    const oppName: string =
-      oppTeam.displayName ??
-      oppTeam.shortDisplayName ??
-      "Unknown";
-    return {
-      opponent: oppName,
-      opponent_abbr: oppTeam.abbreviation ?? "?",
-      date: formatDate(e.date),
-      time: formatTime(e.date),
-      is_home: mine?.homeAway === "home",
-    };
-  });
-
-  return { lastResult, nextGames };
+  return {
+    team_name: teamMeta.name,
+    team_abbr: teamMeta.abbr,
+    record,
+    wins,
+    losses,
+    draws,
+    points,
+    conference: teamMeta.conf,
+    standing: rank,
+    last_result: lastResult,
+    next_game: nextGames[0] ?? null,
+    next_game_2: nextGames[1] ?? null,
+    no_upcoming: nextGames.length === 0,
+    season_complete: nextGames.length === 0 && lastResult !== null,
+    updated_at: formatUpdatedAt(),
+  };
 }
 
 // ── Main Handler ──────────────────────────────────────────────────────────────
@@ -319,39 +249,15 @@ export default {
     const teamId = resolveTeamId(rawTeam);
 
     try {
-      const [teamInfo, recordInfo, scheduleInfo] = await Promise.all([
-        fetchTeamInfo(teamId),
-        fetchRecord(teamId),
-        fetchSchedule(teamId),
-      ]);
+      const data = await getTeamData(teamId);
 
-      // Standings is non-critical — don't block on it
-      const standingsInfo = await fetchStandings(teamId).catch(() => ({
-        conference: "?",
-        position: "?",
-      }));
-
-      const { lastResult, nextGames } = scheduleInfo;
-
-      const merge_variables: Record<string, unknown> = {
-        team_name: teamInfo.name,
-        team_abbr: teamInfo.abbr,
-        record: recordInfo.record,
-        wins: recordInfo.wins,
-        losses: recordInfo.losses,
-        draws: recordInfo.draws,
-        points: recordInfo.points,
-        conference: standingsInfo.conference,
-        standing: standingsInfo.position,
-        last_result: lastResult,
-        next_game: nextGames[0] ?? null,
-        next_game_2: nextGames[1] ?? null,
-        no_upcoming: nextGames.length === 0,
-        season_complete: nextGames.length === 0 && lastResult !== null,
-        updated_at: formatUpdatedAt(),
+      // Return data at root level (what TRMNL expects) AND nested under merge_variables
+      const responsePayload = {
+        ...data,
+        merge_variables: data,
       };
 
-      return new Response(JSON.stringify({ merge_variables }), {
+      return new Response(JSON.stringify(responsePayload), {
         headers: {
           "Content-Type": "application/json",
           "Cache-Control": "public, max-age=1800",
