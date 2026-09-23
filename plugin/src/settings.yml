@@ -1,0 +1,101 @@
+---
+strategy: polling
+no_screen_padding: 'no'
+dark_mode: 'no'
+static_data: ''
+polling_verb: get
+framework_version: 3.3.2
+serverless_language: ''
+polling_url: https://trmnl-mls-plugin.ryanhanwu.workers.dev/mls?team={{ mls_team_id }}
+polling_headers: ''
+polling_body: ''
+id: 485679
+oauth_enabled: 'false'
+oauth_pkce_enabled: 'no'
+oauth_authorize_url: ''
+oauth_token_url: ''
+oauth_scopes: ''
+oauth_scope_separator: ''
+oauth_refresh_url: ''
+oauth_auth_params: ''
+oauth_token_headers: ''
+oauth_token_site: ''
+oauth_token_params: ''
+oauth_token_request_auth_method: ''
+oauth_body_format: ''
+oauth_token_response_metadata: ''
+oauth_authorization_method: ''
+oauth_refresh_params: ''
+oauth_token_field_name: ''
+oauth_expiry_field_name: ''
+oauth_expiry_strategy: ''
+oauth_fixed_expiry_ms: ''
+custom_fields:
+- keyname: mls_team_id
+  field_type: select
+  name: MLS Team
+  description: Select your MLS team to follow
+  options:
+  - - Atlanta United FC
+    - '18418'
+  - - Austin FC
+    - '20906'
+  - - CF Montréal
+    - '9720'
+  - - Charlotte FC
+    - '21300'
+  - - Chicago Fire FC
+    - '182'
+  - - Colorado Rapids
+    - '184'
+  - - Columbus Crew
+    - '183'
+  - - D.C. United
+    - '193'
+  - - FC Cincinnati
+    - '18267'
+  - - FC Dallas
+    - '185'
+  - - Houston Dynamo FC
+    - '6077'
+  - - Inter Miami CF
+    - '20232'
+  - - LA Galaxy
+    - '187'
+  - - LAFC
+    - '18966'
+  - - Minnesota United FC
+    - '17362'
+  - - Nashville SC
+    - '18986'
+  - - New England Revolution
+    - '189'
+  - - New York City FC
+    - '17606'
+  - - New York Red Bulls
+    - '190'
+  - - Orlando City SC
+    - '12011'
+  - - Philadelphia Union
+    - '10739'
+  - - Portland Timbers
+    - '9723'
+  - - Real Salt Lake
+    - '4771'
+  - - San Diego FC
+    - '22529'
+  - - San Jose Earthquakes
+    - '191'
+  - - Seattle Sounders FC
+    - '9726'
+  - - Sporting Kansas City
+    - '186'
+  - - St. Louis CITY SC
+    - '21812'
+  - - Toronto FC
+    - '7318'
+  - - Vancouver Whitecaps
+    - '9727'
+name: Next MLS Game
+description:
+refresh_interval:
