@@ -1,0 +1,27 @@
+{% assign current_team = team_name | default: merge_variables.team_name %}
+{% assign current_standing = standing | default: merge_variables.standing %}
+{% assign current_points = points | default: merge_variables.points %}
+{% assign current_wins = wins | default: merge_variables.wins %}
+{% assign current_draws = draws | default: merge_variables.draws %}
+{% assign current_losses = losses | default: merge_variables.losses %}
+{% assign current_next_game = next_game | default: merge_variables.next_game %}
+
+<div class="layout layout--col gap--space-between">
+  <div class="flex flex--col">
+    <span class="title title--small">{{ current_team }}</span>
+    <span class="label label--small">#{{ current_standing }} • {{ current_points }} pts • {{ current_wins }}W-{{ current_draws }}D-{{ current_losses }}L</span>
+  </div>
+
+  <div class="divider"></div>
+
+  {% if current_next_game %}
+  <div class="flex flex--col gap--tiny">
+    <span class="label label--underline">NEXT MATCH</span>
+    <span class="value">
+      {% if current_next_game.is_home %}vs{% else %}@{% endif %} {{ current_next_game.opponent_abbr }} • {{ current_next_game.date }}
+    </span>
+  </div>
+  {% else %}
+  <span class="label">No upcoming matches</span>
+  {% endif %}
+</div>

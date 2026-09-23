@@ -34,3 +34,9 @@
     - "St. Louis CITY SC"
     - "Toronto FC"
     - "Vancouver Whitecaps"
+
+- keyname: author_bio
+  field_type: author_bio
+  name: About This Plugin
+  description: Track your favorite MLS team's standings, record, last match, and next 3 fixtures.
+  github_url: "https://github.com/ryanhanwu/Next-MLS-Game"
