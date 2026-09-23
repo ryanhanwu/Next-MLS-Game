@@ -14,13 +14,14 @@
 
 <div class="layout layout--col gap--space-between lg:gap--large portrait:gap--small">
 
-  {% render 'title_bar', title: current_team, subtitle: "MLS" %}
-
-  <!-- Subtitle standing bar -->
+  <!-- Header: Team name + standing -->
   <div class="flex gap--medium align-items--center">
-    <span class="label label--small label--underline">
-      ⚽ {{ current_conf }} Conf &nbsp;•&nbsp; #{{ current_standing }} &nbsp;•&nbsp; {{ current_points }} pts
-    </span>
+    <div class="flex flex--col">
+      <span class="title title--large">{{ current_team }}</span>
+      <span class="label label--small label--underline">
+        ⚽ {{ current_conf }} Conf &nbsp;•&nbsp; #{{ current_standing }} &nbsp;•&nbsp; {{ current_points }} pts
+      </span>
+    </div>
   </div>
 
   <!-- Record bar -->
