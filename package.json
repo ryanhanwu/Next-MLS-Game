@@ -1,0 +1,17 @@
+{
+  "name": "trmnl-mls-plugin",
+  "version": "1.0.0",
+  "description": "TRMNL plugin — MLS team stats and upcoming games via ESPN API",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260922.1",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.136.3"
+  }
+}

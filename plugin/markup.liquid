@@ -1,0 +1,89 @@
+{% assign outcome_icon = "—" %}
+{% if last_result.outcome == "W" %}{% assign outcome_icon = "W" %}{% endif %}
+{% if last_result.outcome == "L" %}{% assign outcome_icon = "L" %}{% endif %}
+{% if last_result.outcome == "D" %}{% assign outcome_icon = "D" %}{% endif %}
+
+<div class="layout layout--col gap--space-between">
+
+  {{%-- Header: Team name + standing --%}}
+  <div class="flex gap--medium align-items--center">
+    <div class="flex flex--col">
+      <span class="title title--large">{{ team_name }}</span>
+      <span class="label label--small label--underline">
+        ⚽ {{ conference }} Conf &nbsp;•&nbsp; #{{ standing }} &nbsp;•&nbsp; {{ points }} pts
+      </span>
+    </div>
+  </div>
+
+  {{%-- Record bar --%}}
+  <div class="flex gap--large">
+    <div class="item">
+      <span class="value value--medium">{{ wins }}</span>
+      <span class="label">W</span>
+    </div>
+    <div class="item">
+      <span class="value value--medium">{{ draws }}</span>
+      <span class="label">D</span>
+    </div>
+    <div class="item">
+      <span class="value value--medium">{{ losses }}</span>
+      <span class="label">L</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  {{%-- Last Result --%}}
+  {% if last_result %}
+  <div class="flex flex--col gap--small">
+    <span class="label label--underline">LAST RESULT</span>
+    <div class="flex gap--medium align-items--center">
+      <span class="badge badge--{% if last_result.outcome == 'W' %}success{% elsif last_result.outcome == 'L' %}danger{% else %}neutral{% endif %} value--medium">
+        {{ outcome_icon }}
+      </span>
+      <span class="value">
+        {% if last_result.is_home %}vs {% else %}@ {% endif %}{{ last_result.opponent }}
+      </span>
+      <span class="value value--medium ml--auto">{{ last_result.score }}</span>
+      <span class="label ml--small">{{ last_result.date }}</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="divider"></div>
+
+  {{%-- Upcoming Fixtures --%}}
+  <div class="flex flex--col gap--small">
+    <span class="label label--underline">UPCOMING</span>
+
+    {% if no_upcoming %}
+      <span class="label">Season complete — no upcoming fixtures.</span>
+    {% else %}
+
+      {% if next_game %}
+      <div class="flex gap--medium align-items--center">
+        <span class="label label--small">▶</span>
+        <span class="value">
+          {% if next_game.is_home %}vs {% else %}@ {% endif %}{{ next_game.opponent }}
+        </span>
+        <span class="label ml--auto">{{ next_game.date }} &nbsp; {{ next_game.time }}</span>
+      </div>
+      {% endif %}
+
+      {% if next_game_2 %}
+      <div class="flex gap--medium align-items--center">
+        <span class="label label--small">▶</span>
+        <span class="value">
+          {% if next_game_2.is_home %}vs {% else %}@ {% endif %}{{ next_game_2.opponent }}
+        </span>
+        <span class="label ml--auto">{{ next_game_2.date }} &nbsp; {{ next_game_2.time }}</span>
+      </div>
+      {% endif %}
+
+    {% endif %}
+  </div>
+
+  {{%-- Footer: last updated --%}}
+  <div class="title--small label label--faded">Updated {{ updated_at }}</div>
+
+</div>
