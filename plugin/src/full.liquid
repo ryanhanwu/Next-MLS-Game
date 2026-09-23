@@ -1,26 +1,35 @@
-<div class="layout layout--col gap--space-between lg:gap--large portrait:gap--small">
+<div class="layout layout--col justify--between gap--medium lg:gap--large portrait:gap--small">
 
   <!-- Header: Team name + standing -->
   <div class="flex flex--col gap--tiny">
     <span class="title title--large">{{ team_name | default: "MLS Team" }}</span>
     <span class="label label--small label--underline">
-      ⚽ {{ conference | default: "MLS" }} Conf &nbsp;•&nbsp; #{{ standing | default: "-" }} &nbsp;•&nbsp; {{ points | default: "0" }} pts
+      {{ conference | default: "MLS" }} Conference &nbsp;•&nbsp; #{{ standing | default: "-" }} &nbsp;•&nbsp; {{ points | default: "0" }} pts
     </span>
   </div>
 
   <!-- Record bar -->
   <div class="flex gap--large lg:gap--xlarge">
     <div class="item">
-      <span class="value value--medium">{{ wins | default: "0" }}</span>
-      <span class="label">W</span>
+      <div class="meta"></div>
+      <div class="content">
+        <span class="value value--medium">{{ wins | default: "0" }}</span>
+        <span class="label">W</span>
+      </div>
     </div>
     <div class="item">
-      <span class="value value--medium">{{ draws | default: "0" }}</span>
-      <span class="label">D</span>
+      <div class="meta"></div>
+      <div class="content">
+        <span class="value value--medium">{{ draws | default: "0" }}</span>
+        <span class="label">D</span>
+      </div>
     </div>
     <div class="item">
-      <span class="value value--medium">{{ losses | default: "0" }}</span>
-      <span class="label">L</span>
+      <div class="meta"></div>
+      <div class="content">
+        <span class="value value--medium">{{ losses | default: "0" }}</span>
+        <span class="label">L</span>
+      </div>
     </div>
   </div>
 
