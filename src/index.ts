@@ -58,8 +58,11 @@ function resolveTeamId(param: string | null): string {
   if (/^\d+$/.test(trimmed) && MLS_TEAMS_DATA[trimmed]) {
     return trimmed;
   }
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normalizedParam = normalize(trimmed);
+
   const match = Object.entries(MLS_TEAMS_DATA).find(
-    ([, meta]) => meta.name.toLowerCase() === trimmed.toLowerCase()
+    ([, meta]) => normalize(meta.name) === normalizedParam
   );
   if (match) return match[0];
   return DEFAULT_TEAM_ID;

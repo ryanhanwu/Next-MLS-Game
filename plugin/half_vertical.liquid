@@ -1,4 +1,4 @@
-<div class="layout layout--col justify--between gap--small">
+<div class="layout layout--col gap--space-between">
   <div class="flex flex--col gap--tiny">
     <span class="title title--medium">{{ team_name | default: "MLS Team" }}</span>
     <span class="label label--small">{{ conference | default: "MLS" }} #{{ standing | default: "-" }} • {{ points | default: "0" }} pts</span>
@@ -26,12 +26,12 @@
     <span class="label label--underline">UPCOMING</span>
     {% if next_game %}
     <span class="value">
-      ▶ {% if next_game.is_home %}vs{% else %}@{% endif %} {{ next_game.opponent_abbr | default: next_game.opponent }} ({{ next_game.date | default: "TBD" }})
+      • {% if next_game.is_home %}vs{% else %}@{% endif %} {{ next_game.opponent_abbr | default: next_game.opponent }} ({{ next_game.date | default: "TBD" }})
     </span>
     {% endif %}
     {% if next_game_2 %}
     <span class="value">
-      ▶ {% if next_game_2.is_home %}vs{% else %}@{% endif %} {{ next_game_2.opponent_abbr | default: next_game_2.opponent }} ({{ next_game_2.date | default: "TBD" }})
+      • {% if next_game_2.is_home %}vs{% else %}@{% endif %} {{ next_game_2.opponent_abbr | default: next_game_2.opponent }} ({{ next_game_2.date | default: "TBD" }})
     </span>
     {% endif %}
   </div>
