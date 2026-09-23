@@ -9,6 +9,50 @@
 
 const CORE = "https://sports.core.api.espn.com/v2/sports/soccer/leagues/usa.1";
 
+const MLS_TEAMS: Record<string, string> = {
+  "Atlanta United FC": "18418",
+  "Austin FC": "20906",
+  "CF Montréal": "9720",
+  "Charlotte FC": "21300",
+  "Chicago Fire FC": "182",
+  "Colorado Rapids": "184",
+  "Columbus Crew": "183",
+  "D.C. United": "193",
+  "FC Cincinnati": "18267",
+  "FC Dallas": "185",
+  "Houston Dynamo FC": "6077",
+  "Inter Miami CF": "20232",
+  "LA Galaxy": "187",
+  "LAFC": "18966",
+  "Minnesota United FC": "17362",
+  "Nashville SC": "18986",
+  "New England Revolution": "189",
+  "New York City FC": "17606",
+  "New York Red Bulls": "190",
+  "Orlando City SC": "12011",
+  "Philadelphia Union": "10739",
+  "Portland Timbers": "9723",
+  "Real Salt Lake": "4771",
+  "San Diego FC": "22529",
+  "San Jose Earthquakes": "191",
+  "Seattle Sounders FC": "9726",
+  "Sporting Kansas City": "186",
+  "St. Louis CITY SC": "21812",
+  "Toronto FC": "7318",
+  "Vancouver Whitecaps": "9727",
+};
+
+function resolveTeamId(param: string | null): string | null {
+  if (!param) return null;
+  const trimmed = param.trim();
+  if (/^\d+$/.test(trimmed)) return trimmed;
+  const match = Object.entries(MLS_TEAMS).find(
+    ([name]) => name.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (match) return match[1];
+  return null;
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Fetch JSON, throwing on non-2xx */
@@ -266,10 +310,11 @@ export default {
       return new Response("Not Found", { status: 404 });
     }
 
-    const teamId = url.searchParams.get("team");
-    if (!teamId || !/^\d+$/.test(teamId)) {
+    const rawTeam = url.searchParams.get("team");
+    const teamId = resolveTeamId(rawTeam);
+    if (!teamId) {
       return new Response(
-        JSON.stringify({ error: "Missing or invalid ?team= parameter" }),
+        JSON.stringify({ error: `Missing or invalid ?team= parameter: "${rawTeam ?? ""}"` }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
