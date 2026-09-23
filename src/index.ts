@@ -42,15 +42,20 @@ const MLS_TEAMS: Record<string, string> = {
   "Vancouver Whitecaps": "9727",
 };
 
-function resolveTeamId(param: string | null): string | null {
-  if (!param) return null;
+const DEFAULT_TEAM_ID = "20232"; // Inter Miami CF default
+
+function resolveTeamId(param: string | null): string {
+  if (!param) return DEFAULT_TEAM_ID;
   const trimmed = param.trim();
+  if (!trimmed || trimmed.includes("{{") || trimmed.includes("}}")) {
+    return DEFAULT_TEAM_ID;
+  }
   if (/^\d+$/.test(trimmed)) return trimmed;
   const match = Object.entries(MLS_TEAMS).find(
     ([name]) => name.toLowerCase() === trimmed.toLowerCase()
   );
   if (match) return match[1];
-  return null;
+  return DEFAULT_TEAM_ID;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -312,12 +317,6 @@ export default {
 
     const rawTeam = url.searchParams.get("team");
     const teamId = resolveTeamId(rawTeam);
-    if (!teamId) {
-      return new Response(
-        JSON.stringify({ error: `Missing or invalid ?team= parameter: "${rawTeam ?? ""}"` }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
-    }
 
     try {
       const [teamInfo, recordInfo, scheduleInfo] = await Promise.all([
