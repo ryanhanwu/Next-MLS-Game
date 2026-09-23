@@ -97,5 +97,5 @@ custom_fields:
   - - Vancouver Whitecaps
     - '9727'
 name: Next MLS Game
-description:
-refresh_interval:
+description: ''
+refresh_interval: 15
