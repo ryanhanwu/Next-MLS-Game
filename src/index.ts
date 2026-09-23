@@ -3,8 +3,7 @@
  *
  * GET /mls?team={team_name_or_id}
  *
- * Returns MLS team stats, conference standing, and upcoming fixtures
- * formatted for TRMNL polling plugins.
+ * Returns MLS team stats, conference standing, last result, and next 3 upcoming games.
  */
 
 const CORE = "https://sports.core.api.espn.com/v2/sports/soccer/leagues/usa.1";
@@ -48,7 +47,7 @@ const MLS_TEAMS_DATA: Record<string, TeamMeta> = {
   "9727":  { name: "Vancouver Whitecaps", abbr: "VAN", conf: "West" },
 };
 
-const DEFAULT_TEAM_ID = "20232"; // Inter Miami CF
+const DEFAULT_TEAM_ID = "20232"; // Inter Miami CF default
 
 function resolveTeamId(param: string | null): string {
   if (!param) return DEFAULT_TEAM_ID;
@@ -153,61 +152,129 @@ async function getTeamData(teamId: string) {
     console.error("Standings fetch error:", err);
   }
 
-  // 2. Fetch events / schedule
+  // 2. Fetch full schedule events (all 34 games) and find current window
   let lastResult: any = null;
   const nextGames: any[] = [];
 
   try {
     const evData = await get<any>(
-      `${CORE}/teams/${teamId}/events?lang=en&region=us&limit=10&season=${currentYear}`
+      `${CORE}/seasons/${currentYear}/types/1/teams/${teamId}/events?lang=en&region=us&limit=50`
     );
     const refs: string[] = (evData.items ?? []).map((i: any) => i["$ref"]);
 
-    for (const ref of refs.slice(0, 4)) {
-      try {
-        const ev = await get<any>(ref);
-        const comp = ev.competitions?.[0];
-        const comps: any[] = comp?.competitors ?? [];
-        const myComp = comps.find(
-          (c) => c.id === teamId || c.team?.["$ref"]?.includes(`/teams/${teamId}`)
-        );
-        const oppComp = comps.find(
-          (c) => c.id !== teamId && !c.team?.["$ref"]?.includes(`/teams/${teamId}`)
-        );
-        const opp = (oppComp?.id && MLS_TEAMS_DATA[oppComp.id]) || {
-          name: ev.name ?? "Opponent",
-          abbr: "?",
-        };
+    if (refs.length > 0) {
+      const now = Date.now();
+      const eventCache = new Map<number, any>();
 
-        const eventTime = new Date(ev.date).getTime();
-        const isCompleted =
-          comp?.status?.type?.completed === true ||
-          eventTime < Date.now() - 3 * 3600 * 1000;
+      const fetchEventAt = async (idx: number) => {
+        if (eventCache.has(idx)) return eventCache.get(idx);
+        const ev = await get<any>(refs[idx]);
+        eventCache.set(idx, ev);
+        return ev;
+      };
 
-        if (isCompleted && !lastResult) {
+      // Binary search to find the index of the first upcoming match
+      let low = 0;
+      let high = refs.length - 1;
+      let firstUpcomingIdx = refs.length;
+
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        const ev = await fetchEventAt(mid);
+        const evTime = new Date(ev.date).getTime();
+        if (evTime >= now) {
+          firstUpcomingIdx = mid;
+          high = mid - 1;
+        } else {
+          low = mid + 1;
+        }
+      }
+
+      // Fetch Last Completed Game
+      const lastGameIdx = firstUpcomingIdx - 1;
+      if (lastGameIdx >= 0) {
+        try {
+          const lastEv = await fetchEventAt(lastGameIdx);
+          const comp = lastEv.competitions?.[0];
+          const comps: any[] = comp?.competitors ?? [];
+          const myComp = comps.find(
+            (c) => c.id === teamId || c.team?.["$ref"]?.includes(`/teams/${teamId}`)
+          );
+          const oppComp = comps.find(
+            (c) => c.id !== teamId && !c.team?.["$ref"]?.includes(`/teams/${teamId}`)
+          );
+          const oppMeta = (oppComp?.id && MLS_TEAMS_DATA[oppComp.id]) || {
+            name: lastEv.name ?? "Opponent",
+            abbr: "?",
+          };
+
+          // Fetch scores
+          let myScoreVal = "?";
+          let oppScoreVal = "?";
+          let outcome = "?";
+
+          if (myComp?.score?.["$ref"] && oppComp?.score?.["$ref"]) {
+            try {
+              const [myScoreData, oppScoreData] = await Promise.all([
+                get<any>(myComp.score["$ref"]),
+                get<any>(oppComp.score["$ref"]),
+              ]);
+              myScoreVal = String(myScoreData.value ?? myScoreData.displayValue ?? "?");
+              oppScoreVal = String(oppScoreData.value ?? oppScoreData.displayValue ?? "?");
+              const mNum = parseFloat(myScoreVal);
+              const oNum = parseFloat(oppScoreVal);
+              if (!isNaN(mNum) && !isNaN(oNum)) {
+                outcome = mNum > oNum ? "W" : mNum < oNum ? "L" : "D";
+              }
+            } catch {
+              // fallback
+            }
+          }
+
           lastResult = {
-            opponent: opp.name,
-            opponent_abbr: opp.abbr,
-            score: "FT",
-            outcome: myComp?.winner ? "W" : oppComp?.winner ? "L" : "D",
-            date: formatDate(ev.date),
+            opponent: oppMeta.name,
+            opponent_abbr: oppMeta.abbr,
+            score: `${myScoreVal}-${oppScoreVal}`,
+            outcome,
+            date: formatDate(lastEv.date),
             is_home: myComp?.homeAway === "home",
           };
-        } else if (!isCompleted && nextGames.length < 2) {
+        } catch (e) {
+          console.error("Last game parse error:", e);
+        }
+      }
+
+      // Fetch Next 3 Upcoming Games
+      for (let i = firstUpcomingIdx; i < Math.min(refs.length, firstUpcomingIdx + 3); i++) {
+        try {
+          const upEv = await fetchEventAt(i);
+          const comp = upEv.competitions?.[0];
+          const comps: any[] = comp?.competitors ?? [];
+          const myComp = comps.find(
+            (c) => c.id === teamId || c.team?.["$ref"]?.includes(`/teams/${teamId}`)
+          );
+          const oppComp = comps.find(
+            (c) => c.id !== teamId && !c.team?.["$ref"]?.includes(`/teams/${teamId}`)
+          );
+          const oppMeta = (oppComp?.id && MLS_TEAMS_DATA[oppComp.id]) || {
+            name: upEv.name ?? "Opponent",
+            abbr: "?",
+          };
+
           nextGames.push({
-            opponent: opp.name,
-            opponent_abbr: opp.abbr,
-            date: formatDate(ev.date),
-            time: formatTime(ev.date),
+            opponent: oppMeta.name,
+            opponent_abbr: oppMeta.abbr,
+            date: formatDate(upEv.date),
+            time: formatTime(upEv.date),
             is_home: myComp?.homeAway === "home",
           });
+        } catch (e) {
+          console.error("Upcoming game parse error:", e);
         }
-      } catch (e) {
-        console.error("Event fetch error:", e);
       }
     }
   } catch (err) {
-    console.error("Events fetch error:", err);
+    console.error("Schedule fetch error:", err);
   }
 
   return {
@@ -223,6 +290,8 @@ async function getTeamData(teamId: string) {
     last_result: lastResult,
     next_game: nextGames[0] ?? null,
     next_game_2: nextGames[1] ?? null,
+    next_game_3: nextGames[2] ?? null,
+    next_games: nextGames,
     no_upcoming: nextGames.length === 0,
     season_complete: nextGames.length === 0 && lastResult !== null,
     updated_at: formatUpdatedAt(),
@@ -251,7 +320,6 @@ export default {
     try {
       const data = await getTeamData(teamId);
 
-      // Return data at root level (what TRMNL expects) AND nested under merge_variables
       const responsePayload = {
         ...data,
         merge_variables: data,
