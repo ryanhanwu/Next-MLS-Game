@@ -1,4 +1,4 @@
-<div class="layout layout--col gap--space-between">
+<div class="layout layout--col justify--between gap--small">
   <div class="flex flex--col gap--tiny">
     <span class="title title--small">{{ team_name | default: "MLS Team" }}</span>
     <span class="label label--small">#{{ standing | default: "-" }} • {{ points | default: "0" }} pts • {{ wins | default: "0" }}W-{{ draws | default: "0" }}D-{{ losses | default: "0" }}L</span>
@@ -10,7 +10,7 @@
   <div class="flex flex--col gap--tiny">
     <span class="label label--underline">NEXT MATCH</span>
     <span class="value">
-      {% if next_game.is_home %}vs{% else %}@{% endif %} {{ next_game.opponent_abbr | default: "OPP" }} • {{ next_game.date | default: "TBD" }}
+      {% if next_game.is_home %}vs{% else %}@{% endif %} {{ next_game.opponent_abbr | default: next_game.opponent }} • {{ next_game.date | default: "TBD" }}
     </span>
   </div>
   {% else %}
