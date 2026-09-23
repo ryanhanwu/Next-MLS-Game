@@ -68,4 +68,4 @@ custom_fields:
   - Vancouver Whitecaps
 name: Next MLS Game
 description: ''
-refresh_interval: 15
+refresh_interval: 60
