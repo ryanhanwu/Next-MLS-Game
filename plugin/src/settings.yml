@@ -74,5 +74,5 @@ custom_fields:
   description: Track your favorite MLS team's standings, record, last match, and next 3 fixtures.
   github_url: https://github.com/ryanhanwu/Next-MLS-Game
 name: Next MLS Game
-description: MLS team tracker
+description: MLS team stats & upcoming games
 refresh_interval: 60
