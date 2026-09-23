@@ -12,20 +12,19 @@
 {% assign current_updated_at = updated_at | default: merge_variables.updated_at %}
 {% assign is_no_upcoming = no_upcoming | default: merge_variables.no_upcoming %}
 
-<div class="layout layout--col gap--space-between">
+<div class="layout layout--col gap--space-between lg:gap--large portrait:gap--small">
 
-  <!-- Header: Team name + standing -->
+  {% render 'title_bar', title: current_team, subtitle: "MLS" %}
+
+  <!-- Subtitle standing bar -->
   <div class="flex gap--medium align-items--center">
-    <div class="flex flex--col">
-      <span class="title title--large">{{ current_team }}</span>
-      <span class="label label--small label--underline">
-        ⚽ {{ current_conf }} Conf &nbsp;•&nbsp; #{{ current_standing }} &nbsp;•&nbsp; {{ current_points }} pts
-      </span>
-    </div>
+    <span class="label label--small label--underline">
+      ⚽ {{ current_conf }} Conf &nbsp;•&nbsp; #{{ current_standing }} &nbsp;•&nbsp; {{ current_points }} pts
+    </span>
   </div>
 
   <!-- Record bar -->
-  <div class="flex gap--large">
+  <div class="flex gap--large lg:gap--xlarge">
     <div class="item">
       <span class="value value--medium">{{ current_wins }}</span>
       <span class="label">W</span>
@@ -46,7 +45,7 @@
   {% if current_last_result %}
   <div class="flex flex--col gap--small">
     <span class="label label--underline">LAST RESULT</span>
-    <div class="flex gap--medium align-items--center">
+    <div class="flex gap--medium align-items--center portrait:flex--wrap">
       <span class="badge badge--{% if current_last_result.outcome == 'W' %}success{% elsif current_last_result.outcome == 'L' %}danger{% else %}neutral{% endif %} value--medium">
         {{ current_last_result.outcome }}
       </span>
