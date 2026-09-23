@@ -1,41 +1,25 @@
-{% assign current_team = team_name | default: merge_variables.team_name %}
-{% assign current_conf = conference | default: merge_variables.conference %}
-{% assign current_standing = standing | default: merge_variables.standing %}
-{% assign current_points = points | default: merge_variables.points %}
-{% assign current_wins = wins | default: merge_variables.wins %}
-{% assign current_draws = draws | default: merge_variables.draws %}
-{% assign current_losses = losses | default: merge_variables.losses %}
-{% assign current_last_result = last_result | default: merge_variables.last_result %}
-{% assign current_next_game = next_game | default: merge_variables.next_game %}
-{% assign current_next_game_2 = next_game_2 | default: merge_variables.next_game_2 %}
-{% assign current_next_game_3 = next_game_3 | default: merge_variables.next_game_3 %}
-{% assign current_updated_at = updated_at | default: merge_variables.updated_at %}
-{% assign is_no_upcoming = no_upcoming | default: merge_variables.no_upcoming %}
-
 <div class="layout layout--col gap--space-between lg:gap--large portrait:gap--small">
 
   <!-- Header: Team name + standing -->
-  <div class="flex gap--medium align-items--center">
-    <div class="flex flex--col">
-      <span class="title title--large">{{ current_team }}</span>
-      <span class="label label--small label--underline">
-        ⚽ {{ current_conf }} Conf &nbsp;•&nbsp; #{{ current_standing }} &nbsp;•&nbsp; {{ current_points }} pts
-      </span>
-    </div>
+  <div class="flex flex--col gap--tiny">
+    <span class="title title--large">{{ team_name | default: "MLS Team" }}</span>
+    <span class="label label--small label--underline">
+      ⚽ {{ conference | default: "MLS" }} Conf &nbsp;•&nbsp; #{{ standing | default: "-" }} &nbsp;•&nbsp; {{ points | default: "0" }} pts
+    </span>
   </div>
 
   <!-- Record bar -->
   <div class="flex gap--large lg:gap--xlarge">
     <div class="item">
-      <span class="value value--medium">{{ current_wins }}</span>
+      <span class="value value--medium">{{ wins | default: "0" }}</span>
       <span class="label">W</span>
     </div>
     <div class="item">
-      <span class="value value--medium">{{ current_draws }}</span>
+      <span class="value value--medium">{{ draws | default: "0" }}</span>
       <span class="label">D</span>
     </div>
     <div class="item">
-      <span class="value value--medium">{{ current_losses }}</span>
+      <span class="value value--medium">{{ losses | default: "0" }}</span>
       <span class="label">L</span>
     </div>
   </div>
@@ -43,18 +27,22 @@
   <div class="divider"></div>
 
   <!-- Last Result -->
-  {% if current_last_result %}
+  {% if last_result %}
   <div class="flex flex--col gap--small">
     <span class="label label--underline">LAST RESULT</span>
-    <div class="flex gap--medium align-items--center portrait:flex--wrap">
-      <span class="badge badge--{% if current_last_result.outcome == 'W' %}success{% elsif current_last_result.outcome == 'L' %}danger{% else %}neutral{% endif %} value--medium">
-        {{ current_last_result.outcome }}
-      </span>
-      <span class="value">
-        {% if current_last_result.is_home %}vs {% else %}@ {% endif %}{{ current_last_result.opponent }}
-      </span>
-      <span class="value value--medium ml--auto">{{ current_last_result.score }}</span>
-      <span class="label ml--small">{{ current_last_result.date }}</span>
+    <div class="flex flex--between flex--center-y portrait:flex--wrap">
+      <div class="flex flex--center-y gap--small">
+        <span class="label label--filled {% if last_result.outcome == 'W' %}label--success{% elsif last_result.outcome == 'L' %}label--error{% else %}label--warning{% endif %}">
+          {{ last_result.outcome | default: "FT" }}
+        </span>
+        <span class="value">
+          {% if last_result.is_home %}vs {% else %}@ {% endif %}{{ last_result.opponent | default: "Opponent" }}
+        </span>
+      </div>
+      <div class="flex flex--center-y gap--small">
+        <span class="value value--medium">{{ last_result.score | default: "FT" }}</span>
+        <span class="label label--gray">{{ last_result.date | default: "" }}</span>
+      </div>
     </div>
   </div>
   <div class="divider"></div>
@@ -64,37 +52,34 @@
   <div class="flex flex--col gap--small">
     <span class="label label--underline">UPCOMING MATCHES</span>
 
-    {% if is_no_upcoming or current_next_game == nil %}
-      <span class="label">Season complete — no upcoming fixtures.</span>
+    {% if no_upcoming or next_game == nil %}
+      <span class="label label--gray">Season complete — no upcoming fixtures.</span>
     {% else %}
 
-      {% if current_next_game %}
-      <div class="flex gap--medium align-items--center">
-        <span class="label label--small">▶</span>
+      {% if next_game %}
+      <div class="flex flex--between flex--center-y">
         <span class="value">
-          {% if current_next_game.is_home %}vs {% else %}@ {% endif %}{{ current_next_game.opponent }}
+          ▶ {% if next_game.is_home %}vs {% else %}@ {% endif %}{{ next_game.opponent | default: "Opponent" }}
         </span>
-        <span class="label ml--auto">{{ current_next_game.date }} &nbsp; {{ current_next_game.time }}</span>
+        <span class="label label--gray">{{ next_game.date | default: "TBD" }} &nbsp; {{ next_game.time | default: "" }}</span>
       </div>
       {% endif %}
 
-      {% if current_next_game_2 %}
-      <div class="flex gap--medium align-items--center">
-        <span class="label label--small">▶</span>
+      {% if next_game_2 %}
+      <div class="flex flex--between flex--center-y">
         <span class="value">
-          {% if current_next_game_2.is_home %}vs {% else %}@ {% endif %}{{ current_next_game_2.opponent }}
+          ▶ {% if next_game_2.is_home %}vs {% else %}@ {% endif %}{{ next_game_2.opponent | default: "Opponent" }}
         </span>
-        <span class="label ml--auto">{{ current_next_game_2.date }} &nbsp; {{ current_next_game_2.time }}</span>
+        <span class="label label--gray">{{ next_game_2.date | default: "TBD" }} &nbsp; {{ next_game_2.time | default: "" }}</span>
       </div>
       {% endif %}
 
-      {% if current_next_game_3 %}
-      <div class="flex gap--medium align-items--center">
-        <span class="label label--small">▶</span>
+      {% if next_game_3 %}
+      <div class="flex flex--between flex--center-y">
         <span class="value">
-          {% if current_next_game_3.is_home %}vs {% else %}@ {% endif %}{{ current_next_game_3.opponent }}
+          ▶ {% if next_game_3.is_home %}vs {% else %}@ {% endif %}{{ next_game_3.opponent | default: "Opponent" }}
         </span>
-        <span class="label ml--auto">{{ current_next_game_3.date }} &nbsp; {{ current_next_game_3.time }}</span>
+        <span class="label label--gray">{{ next_game_3.date | default: "TBD" }} &nbsp; {{ next_game_3.time | default: "" }}</span>
       </div>
       {% endif %}
 
@@ -102,11 +87,11 @@
   </div>
 
   <!-- Footer: last updated -->
-  <div class="title--small label label--faded">Updated {{ current_updated_at }}</div>
+  <div class="label label--small label--gray">Updated {{ updated_at | default: "Recently" }}</div>
 
 </div>
 
 <div class="title_bar">
-  <span class="title">{{ current_team }}</span>
+  <span class="title">{{ team_name | default: "MLS Tracker" }}</span>
   <span class="instance">MLS</span>
 </div>
