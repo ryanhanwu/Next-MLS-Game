@@ -1,45 +1,40 @@
-{% assign current_team = team_name | default: merge_variables.team_name %}
-{% assign current_conf = conference | default: merge_variables.conference %}
-{% assign current_standing = standing | default: merge_variables.standing %}
-{% assign current_points = points | default: merge_variables.points %}
-{% assign current_wins = wins | default: merge_variables.wins %}
-{% assign current_draws = draws | default: merge_variables.draws %}
-{% assign current_losses = losses | default: merge_variables.losses %}
-{% assign current_last_result = last_result | default: merge_variables.last_result %}
-{% assign current_next_game = next_game | default: merge_variables.next_game %}
-
 <div class="layout layout--col gap--space-between">
-  <div class="flex justify-between align-items--center">
+  <div class="flex flex--between flex--center-y">
     <div class="flex flex--col">
-      <span class="title title--medium">{{ current_team }}</span>
-      <span class="label label--small">⚽ {{ current_conf }} #{{ current_standing }} • {{ current_points }} pts</span>
+      <span class="title title--medium">{{ team_name | default: "MLS Team" }}</span>
+      <span class="label label--small">⚽ {{ conference | default: "MLS" }} #{{ standing | default: "-" }} • {{ points | default: "0" }} pts</span>
     </div>
     <div class="flex gap--medium">
-      <span class="value">{{ current_wins }}W</span>
-      <span class="value">{{ current_draws }}D</span>
-      <span class="value">{{ current_losses }}L</span>
+      <span class="value">{{ wins | default: "0" }}W</span>
+      <span class="value">{{ draws | default: "0" }}D</span>
+      <span class="value">{{ losses | default: "0" }}L</span>
     </div>
   </div>
 
   <div class="divider"></div>
 
-  <div class="flex justify-between">
-    {% if current_last_result %}
+  <div class="flex flex--between">
+    {% if last_result %}
     <div class="flex flex--col gap--tiny">
       <span class="label label--underline">LAST RESULT</span>
       <span class="value">
-        [{{ current_last_result.outcome }}] {% if current_last_result.is_home %}vs{% else %}@{% endif %} {{ current_last_result.opponent_abbr }} {{ current_last_result.score }}
+        [{{ last_result.outcome | default: "FT" }}] {% if last_result.is_home %}vs{% else %}@{% endif %} {{ last_result.opponent_abbr | default: "OPP" }} {{ last_result.score | default: "" }}
       </span>
     </div>
     {% endif %}
 
-    {% if current_next_game %}
+    {% if next_game %}
     <div class="flex flex--col gap--tiny">
       <span class="label label--underline">NEXT MATCH</span>
       <span class="value">
-        {% if current_next_game.is_home %}vs{% else %}@{% endif %} {{ current_next_game.opponent_abbr }} • {{ current_next_game.date }}
+        {% if next_game.is_home %}vs{% else %}@{% endif %} {{ next_game.opponent_abbr | default: "OPP" }} • {{ next_game.date | default: "TBD" }}
       </span>
     </div>
     {% endif %}
   </div>
+</div>
+
+<div class="title_bar">
+  <span class="title">{{ team_name | default: "MLS Tracker" }}</span>
+  <span class="instance">MLS</span>
 </div>

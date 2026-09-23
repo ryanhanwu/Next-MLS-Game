@@ -1,0 +1,40 @@
+name: MLS Team Tracker
+description: MLS team stats & upcoming games
+tagline: MLS team stats & upcoming games
+category: Sports
+strategy: Polling
+polling_verb: GET
+polling_url: "https://trmnl-mls-plugin.ryanhanwu.workers.dev/mls?team=##{{ mls_team_id }}"
+polling_interval: 3600
+
+# The Cloudflare Worker returns a JSON object with these top-level keys:
+# {
+#   "team_name": "Inter Miami CF",
+#   "team_abbr": "MIA",
+#   "record": "12-10-4",
+#   "wins": "12",
+#   "losses": "4",
+#   "draws": "10",
+#   "points": "46",
+#   "conference": "East",
+#   "standing": "3",
+#   "last_result": {
+#     "opponent": "San Diego FC",
+#     "opponent_abbr": "SD",
+#     "score": "2-2",
+#     "outcome": "D",
+#     "date": "Sep 20",
+#     "is_home": true
+#   },
+#   "next_game": {
+#     "opponent": "Columbus Crew",
+#     "opponent_abbr": "CLB",
+#     "date": "Sep 27",
+#     "time": "7:00 PM ET",
+#     "is_home": false
+#   },
+#   "next_game_2": { ... },
+#   "next_game_3": { ... },
+#   "no_upcoming": false,
+#   "updated_at": "Sep 22, 9:20 PM"
+# }
