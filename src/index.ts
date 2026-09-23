@@ -2,50 +2,31 @@
  * TRMNL MLS Plugin — Cloudflare Worker
  *
  * GET /mls?team={espn_team_id}
- * Returns a TRMNL-compatible merge_variables payload with:
- *   - Team name, record, conference, points, standing position
- *   - Last completed result
- *   - Next 2 upcoming fixtures
+ *
+ * Uses sports.core.api.espn.com which works from Cloudflare IPs.
+ * site.api.espn.com returns 403 from datacenter IPs.
  */
 
-const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1";
-const ESPN_STANDINGS = "https://site.api.espn.com/apis/v2/sports/soccer/usa.1/standings";
-
-// ── Types ────────────────────────────────────────────────────────────────────
-
-interface Competitor {
-  homeAway: "home" | "away";
-  team: { id: string; displayName: string; abbreviation: string };
-  score: string | { displayValue: string; winner?: boolean };
-  winner?: boolean;
-}
-
-interface EspnEvent {
-  id: string;
-  date: string;
-  name: string;
-  competitions: Array<{
-    status: { type: { completed: boolean; description: string } };
-    competitors: Competitor[];
-    venue?: { fullName: string };
-  }>;
-}
-
-interface StandingsEntry {
-  team: { id: string; displayName: string };
-  stats: Array<{ name: string; value: number; displayValue: string }>;
-}
+const CORE = "https://sports.core.api.espn.com/v2/sports/soccer/leagues/usa.1";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function getScore(score: string | { displayValue: string }): string {
-  if (typeof score === "string") return score;
-  return score?.displayValue ?? "?";
+/** Fetch JSON, throwing on non-2xx */
+async function get<T>(url: string): Promise<T> {
+  // ESPN core API uses http:// in $ref links — upgrade to https
+  const safeUrl = url.replace(/^http:\/\//, "https://");
+  const res = await fetch(safeUrl, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; TRMNL-MLS-Plugin/1.0)",
+    },
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${safeUrl}`);
+  return res.json() as Promise<T>;
 }
 
 function formatDate(isoDate: string): string {
-  const d = new Date(isoDate);
-  return d.toLocaleDateString("en-US", {
+  return new Date(isoDate).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     timeZone: "America/New_York",
@@ -53,9 +34,8 @@ function formatDate(isoDate: string): string {
 }
 
 function formatTime(isoDate: string): string {
-  const d = new Date(isoDate);
   return (
-    d.toLocaleTimeString("en-US", {
+    new Date(isoDate).toLocaleTimeString("en-US", {
       hour: "numeric",
       minute: "2-digit",
       timeZone: "America/New_York",
@@ -75,111 +55,199 @@ function formatUpdatedAt(): string {
   });
 }
 
-function statValue(stats: StandingsEntry["stats"], name: string): string {
-  return stats.find((s) => s.name === name)?.displayValue ?? "?";
-}
-
 // ── ESPN Fetchers ─────────────────────────────────────────────────────────────
 
-async function fetchTeam(teamId: string) {
-  const res = await fetch(`${ESPN_BASE}/teams/${teamId}`);
-  if (!res.ok) throw new Error(`Team fetch failed: ${res.status}`);
-  const data: any = await res.json();
-  const team = data.team;
-  const recordItems: Array<{ type: string; summary: string }> =
-    team?.record?.items ?? [];
-  const total = recordItems.find((r: any) => r.type === "total");
+async function fetchTeamInfo(teamId: string) {
+  const data = await get<any>(
+    `${CORE}/teams/${teamId}?lang=en&region=us`
+  );
   return {
-    name: team.displayName as string,
-    abbr: team.abbreviation as string,
-    record: total?.summary ?? "?",
+    name: data.displayName as string,
+    abbr: data.abbreviation as string,
   };
+}
+
+async function fetchRecord(teamId: string) {
+  // type 1 = regular season record (works for current season)
+  const year = new Date().getFullYear();
+  const data = await get<any>(
+    `${CORE}/seasons/${year}/types/1/teams/${teamId}/record?lang=en&region=us`
+  );
+  const total = (data.items ?? []).find((i: any) => i.type === "total");
+  const stats = Object.fromEntries(
+    (total?.stats ?? []).map((s: any) => [s.name, s.displayValue])
+  );
+  return {
+    record: total?.summary ?? "?",
+    wins: stats.wins ?? "?",
+    losses: stats.losses ?? "?",
+    draws: stats.ties ?? "?",
+    points: stats.points ?? "?",
+  };
+}
+
+async function fetchStandings(teamId: string) {
+  // Fetch all events to find standing — use the team events list
+  // The core API embeds record + groups on each competitor
+  // Instead, walk all events to find the team's group standing
+  // Simpler: re-use the record endpoint which contains points
+  // For position, fetch the scoreboard-style standing from the team's record groups
+
+  // Fetch the team's season record which includes group/conference info
+  const teamData = await get<any>(
+    `${CORE}/teams/${teamId}?lang=en&region=us`
+  );
+
+  // Try to get conference from team's groups
+  const groupsRef: string | undefined = teamData.groups?.["$ref"];
+
+  let conference = "?";
+  let position: number | string = "?";
+
+  if (groupsRef) {
+    try {
+      const groups = await get<any>(groupsRef);
+      const items: any[] = groups.items ?? [];
+      if (items.length > 0) {
+        const groupData = await get<any>(items[0]["$ref"]);
+        conference = (groupData.name as string)
+          .replace(" Conference", "")
+          .replace("Eastern", "East")
+          .replace("Western", "West");
+
+        // Fetch standings for this conference group
+        const standRef: string | undefined = groupData.standings?.["$ref"];
+        if (standRef) {
+          const standData = await get<any>(standRef + "&limit=30");
+          const entries: any[] = standData.entries ?? [];
+          const idx = entries.findIndex(
+            (e: any) => e.team?.id === teamId || e.team?.["$ref"]?.includes(`/teams/${teamId}`)
+          );
+          if (idx !== -1) position = idx + 1;
+        }
+      }
+    } catch {
+      // non-critical — fall through with defaults
+    }
+  }
+
+  return { conference, position };
 }
 
 async function fetchSchedule(teamId: string) {
   const year = new Date().getFullYear();
-  const res = await fetch(`${ESPN_BASE}/teams/${teamId}/schedule?season=${year}`);
-  if (!res.ok) throw new Error(`Schedule fetch failed: ${res.status}`);
-  const data: any = await res.json();
-  const events: EspnEvent[] = data.events ?? [];
 
-  const completed = events.filter(
-    (e) => e.competitions?.[0]?.status?.type?.completed === true
-  );
-  const upcoming = events.filter(
-    (e) => e.competitions?.[0]?.status?.type?.completed === false
+  // Get paginated events for this team
+  const data = await get<any>(
+    `${CORE}/teams/${teamId}/events?lang=en&region=us&limit=100&season=${year}`
   );
 
-  // Last result
-  let lastResult: Record<string, unknown> | null = null;
-  if (completed.length > 0) {
-    const last = completed[completed.length - 1];
-    const comp = last.competitions[0];
-    const home = comp.competitors.find((c) => c.homeAway === "home")!;
-    const away = comp.competitors.find((c) => c.homeAway === "away")!;
-    const isHome = home.team.id === teamId;
-    const myTeam = isHome ? home : away;
-    const opponent = isHome ? away : home;
-    const myScore = getScore(myTeam.score);
-    const oppScore = getScore(opponent.score);
-    const myGoals = parseInt(myScore, 10);
-    const oppGoals = parseInt(oppScore, 10);
-    const outcome =
-      myGoals > oppGoals ? "W" : myGoals < oppGoals ? "L" : "D";
-    lastResult = {
-      opponent: opponent.team.displayName,
-      opponent_abbr: opponent.team.abbreviation,
-      score: `${myScore}-${oppScore}`,
-      outcome,
-      date: formatDate(last.date),
-      is_home: isHome,
-    };
+  const refs: string[] = (data.items ?? []).map((i: any) => i["$ref"]);
+
+  if (refs.length === 0) {
+    return { lastResult: null, nextGames: [] };
   }
 
-  // Next 2 upcoming games
+  // Fetch all events in parallel (batched to avoid overload)
+  const batchSize = 20;
+  const events: any[] = [];
+  for (let i = 0; i < refs.length; i += batchSize) {
+    const batch = refs.slice(i, i + batchSize);
+    const results = await Promise.allSettled(batch.map((r) => get<any>(r)));
+    for (const r of results) {
+      if (r.status === "fulfilled") events.push(r.value);
+    }
+  }
+
+  // Sort by date
+  events.sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  const now = Date.now();
+  const completed = events.filter(
+    (e) =>
+      e.competitions?.[0]?.status?.type?.completed === true ||
+      new Date(e.date).getTime() < now - 2 * 60 * 60 * 1000 // > 2h ago
+  );
+  const upcoming = events.filter(
+    (e) =>
+      !e.competitions?.[0]?.status?.type?.completed &&
+      new Date(e.date).getTime() > now - 60 * 60 * 1000 // not more than 1h ago
+  );
+
+  function parseCompetitor(comp: any, myTeamId: string) {
+    const competitors: any[] = comp.competitors ?? [];
+    const mine = competitors.find(
+      (c) =>
+        c.team?.id === myTeamId ||
+        c.team?.["$ref"]?.includes(`/teams/${myTeamId}`)
+    );
+    const opp = competitors.find(
+      (c) =>
+        c.team?.id !== myTeamId &&
+        !c.team?.["$ref"]?.includes(`/teams/${myTeamId}`)
+    );
+    return { mine, opp };
+  }
+
+  // Last result
+  let lastResult = null;
+  if (completed.length > 0) {
+    const last = completed[completed.length - 1];
+    const comp = last.competitions?.[0];
+    if (comp) {
+      const { mine, opp } = parseCompetitor(comp, teamId);
+      if (mine && opp) {
+        const oppTeam = opp.team ?? {};
+        const oppName: string =
+          oppTeam.displayName ??
+          oppTeam.shortDisplayName ??
+          oppTeam["$ref"]?.split("/teams/")[1]?.split("?")[0] ??
+          "Unknown";
+        const oppAbbr: string = oppTeam.abbreviation ?? "?";
+        const myScore =
+          typeof mine.score === "object"
+            ? mine.score?.displayValue ?? mine.score?.value?.toString() ?? "?"
+            : mine.score ?? "?";
+        const oppScore =
+          typeof opp.score === "object"
+            ? opp.score?.displayValue ?? opp.score?.value?.toString() ?? "?"
+            : opp.score ?? "?";
+        const myG = parseFloat(myScore);
+        const oppG = parseFloat(oppScore);
+        const outcome = isNaN(myG) || isNaN(oppG) ? "?" : myG > oppG ? "W" : myG < oppG ? "L" : "D";
+        lastResult = {
+          opponent: oppName,
+          opponent_abbr: oppAbbr,
+          score: `${myScore}-${oppScore}`,
+          outcome,
+          date: formatDate(last.date),
+          is_home: mine.homeAway === "home",
+        };
+      }
+    }
+  }
+
+  // Next 2 upcoming
   const nextGames = upcoming.slice(0, 2).map((e) => {
-    const comp = e.competitions[0];
-    const home = comp.competitors.find((c) => c.homeAway === "home")!;
-    const away = comp.competitors.find((c) => c.homeAway === "away")!;
-    const isHome = home.team.id === teamId;
-    const opponent = isHome ? away : home;
+    const comp = e.competitions?.[0];
+    const { mine, opp } = parseCompetitor(comp ?? {}, teamId);
+    const oppTeam = opp?.team ?? {};
+    const oppName: string =
+      oppTeam.displayName ??
+      oppTeam.shortDisplayName ??
+      "Unknown";
     return {
-      opponent: opponent.team.displayName,
-      opponent_abbr: opponent.team.abbreviation,
+      opponent: oppName,
+      opponent_abbr: oppTeam.abbreviation ?? "?",
       date: formatDate(e.date),
       time: formatTime(e.date),
-      is_home: isHome,
+      is_home: mine?.homeAway === "home",
     };
   });
 
   return { lastResult, nextGames };
-}
-
-async function fetchStandings(teamId: string) {
-  const res = await fetch(ESPN_STANDINGS);
-  if (!res.ok) throw new Error(`Standings fetch failed: ${res.status}`);
-  const data: any = await res.json();
-
-  const conferences: Array<{ name: string; standings: { entries: StandingsEntry[] } }> =
-    data.children ?? [];
-
-  for (const conf of conferences) {
-    const entries = conf.standings?.entries ?? [];
-    const idx = entries.findIndex((e: any) => e.team?.id === teamId);
-    if (idx !== -1) {
-      const entry = entries[idx];
-      const stats = entry.stats ?? [];
-      return {
-        conference: conf.name.replace(" Conference", ""),
-        position: idx + 1,
-        points: statValue(stats, "points"),
-        wins: statValue(stats, "wins"),
-        losses: statValue(stats, "losses"),
-        draws: statValue(stats, "ties"),
-      };
-    }
-  }
-  return null;
 }
 
 // ── Main Handler ──────────────────────────────────────────────────────────────
@@ -188,7 +256,6 @@ export default {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
-    // Health check
     if (url.pathname === "/") {
       return new Response(JSON.stringify({ status: "ok", plugin: "TRMNL MLS" }), {
         headers: { "Content-Type": "application/json" },
@@ -208,57 +275,42 @@ export default {
     }
 
     try {
-      // Fetch all three ESPN sources in parallel
-      const [teamInfo, scheduleInfo, standingsInfo] = await Promise.all([
-        fetchTeam(teamId),
+      const [teamInfo, recordInfo, scheduleInfo] = await Promise.all([
+        fetchTeamInfo(teamId),
+        fetchRecord(teamId),
         fetchSchedule(teamId),
-        fetchStandings(teamId),
       ]);
 
+      // Standings is non-critical — don't block on it
+      const standingsInfo = await fetchStandings(teamId).catch(() => ({
+        conference: "?",
+        position: "?",
+      }));
+
       const { lastResult, nextGames } = scheduleInfo;
-      const next1 = nextGames[0] ?? null;
-      const next2 = nextGames[1] ?? null;
 
       const merge_variables: Record<string, unknown> = {
-        // Team identity
         team_name: teamInfo.name,
         team_abbr: teamInfo.abbr,
-        record: teamInfo.record,
-
-        // Standings
-        conference: standingsInfo?.conference ?? "?",
-        standing: standingsInfo?.position ?? "?",
-        points: standingsInfo?.points ?? "?",
-        wins: standingsInfo?.wins ?? "?",
-        losses: standingsInfo?.losses ?? "?",
-        draws: standingsInfo?.draws ?? "?",
-
-        // Last result
-        last_result: lastResult
-          ? {
-              opponent: lastResult.opponent,
-              opponent_abbr: lastResult.opponent_abbr,
-              score: lastResult.score,
-              outcome: lastResult.outcome,
-              date: lastResult.date,
-              is_home: lastResult.is_home,
-            }
-          : null,
-
-        // Upcoming fixtures
-        next_game: next1,
-        next_game_2: next2,
-
-        // Metadata
-        updated_at: formatUpdatedAt(),
+        record: recordInfo.record,
+        wins: recordInfo.wins,
+        losses: recordInfo.losses,
+        draws: recordInfo.draws,
+        points: recordInfo.points,
+        conference: standingsInfo.conference,
+        standing: standingsInfo.position,
+        last_result: lastResult,
+        next_game: nextGames[0] ?? null,
+        next_game_2: nextGames[1] ?? null,
         no_upcoming: nextGames.length === 0,
         season_complete: nextGames.length === 0 && lastResult !== null,
+        updated_at: formatUpdatedAt(),
       };
 
       return new Response(JSON.stringify({ merge_variables }), {
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=1800", // cache 30 min
+          "Cache-Control": "public, max-age=1800",
         },
       });
     } catch (err: any) {
