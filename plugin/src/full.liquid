@@ -1,4 +1,4 @@
-<div class="layout layout--col justify--between gap--medium lg:gap--large portrait:gap--small">
+<div class="layout layout--col gap--space-between">
 
   <!-- Header: Team name + standing -->
   <div class="flex flex--col gap--tiny">
@@ -9,7 +9,7 @@
   </div>
 
   <!-- Record bar -->
-  <div class="flex gap--large lg:gap--xlarge">
+  <div class="flex gap--large">
     <div class="item">
       <div class="meta"></div>
       <div class="content">
@@ -39,7 +39,7 @@
   {% if last_result %}
   <div class="flex flex--col gap--small">
     <span class="label label--underline">LAST RESULT</span>
-    <div class="flex flex--between flex--center-y portrait:flex--wrap">
+    <div class="flex flex--between flex--center-y">
       <div class="flex flex--center-y gap--small">
         <span class="label label--filled {% if last_result.outcome == 'W' %}label--success{% elsif last_result.outcome == 'L' %}label--error{% else %}label--warning{% endif %}">
           {{ last_result.outcome | default: "FT" }}
@@ -68,7 +68,7 @@
       {% if next_game %}
       <div class="flex flex--between flex--center-y">
         <span class="value">
-          ▶ {% if next_game.is_home %}vs {% else %}@ {% endif %}{{ next_game.opponent | default: "Opponent" }}
+          • {% if next_game.is_home %}vs {% else %}@ {% endif %}{{ next_game.opponent | default: "Opponent" }}
         </span>
         <span class="label label--gray">{{ next_game.date | default: "TBD" }} &nbsp; {{ next_game.time | default: "" }}</span>
       </div>
@@ -77,7 +77,7 @@
       {% if next_game_2 %}
       <div class="flex flex--between flex--center-y">
         <span class="value">
-          ▶ {% if next_game_2.is_home %}vs {% else %}@ {% endif %}{{ next_game_2.opponent | default: "Opponent" }}
+          • {% if next_game_2.is_home %}vs {% else %}@ {% endif %}{{ next_game_2.opponent | default: "Opponent" }}
         </span>
         <span class="label label--gray">{{ next_game_2.date | default: "TBD" }} &nbsp; {{ next_game_2.time | default: "" }}</span>
       </div>
@@ -86,7 +86,7 @@
       {% if next_game_3 %}
       <div class="flex flex--between flex--center-y">
         <span class="value">
-          ▶ {% if next_game_3.is_home %}vs {% else %}@ {% endif %}{{ next_game_3.opponent | default: "Opponent" }}
+          • {% if next_game_3.is_home %}vs {% else %}@ {% endif %}{{ next_game_3.opponent | default: "Opponent" }}
         </span>
         <span class="label label--gray">{{ next_game_3.date | default: "TBD" }} &nbsp; {{ next_game_3.time | default: "" }}</span>
       </div>
