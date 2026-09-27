@@ -1,20 +1,20 @@
-<div class="layout layout--col justify--between gap--small">
+<div class="layout layout--col gap--space-between lg:gap--medium portrait:gap--tiny">
   <div class="flex flex--col gap--tiny">
-    <span class="title title--small">{{ team_name | default: "MLS Team" }}</span>
-    <span class="label label--small">#{{ standing | default: "-" }} • {{ points | default: "0" }} pts • {{ wins | default: "0" }}W-{{ draws | default: "0" }}D-{{ losses | default: "0" }}L</span>
+    <span class="title title--small lg:title--large">{{ team_name | default: "MLS Team" }}</span>
+    <span class="label label--small lg:label--base">#{{ standing | default: "-" }} • {{ points | default: "0" }} pts • {{ wins | default: "0" }}W-{{ draws | default: "0" }}D-{{ losses | default: "0" }}L</span>
   </div>
 
   <div class="divider"></div>
 
   {% if next_game %}
   <div class="flex flex--col gap--tiny">
-    <span class="label label--underline">NEXT MATCH</span>
-    <span class="value">
+    <span class="label label--underline lg:label--base">NEXT MATCH</span>
+    <span class="value lg:value--medium">
       {% if next_game.is_home %}vs{% else %}@{% endif %} {{ next_game.opponent_abbr | default: next_game.opponent }} • {{ next_game.date | default: "TBD" }}
     </span>
   </div>
   {% else %}
-  <span class="label label--gray">No upcoming matches</span>
+  <span class="label label--gray lg:label--base">No upcoming matches</span>
   {% endif %}
 </div>
 
