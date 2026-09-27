@@ -1,21 +1,21 @@
-<div class="layout layout--col gap--space-between lg:gap--medium portrait:gap--small">
+<div class="layout layout--col gap--space-between lg:gap--large portrait:gap--small">
   <div class="flex flex--col gap--tiny">
-    <span class="title title--medium lg:title--large">{{ team_name | default: "MLS Team" }}</span>
-    <span class="label label--small">{{ conference | default: "MLS" }} #{{ standing | default: "-" }} • {{ points | default: "0" }} pts</span>
+    <span class="title title--medium lg:title--xlarge">{{ team_name | default: "MLS Team" }}</span>
+    <span class="label label--small lg:label--base">{{ conference | default: "MLS" }} #{{ standing | default: "-" }} • {{ points | default: "0" }} pts</span>
   </div>
 
   <div class="flex gap--medium lg:gap--large portrait:gap--small">
-    <div class="item"><div class="meta"></div><div class="content"><span class="value">{{ wins | default: "0" }}</span><span class="label">W</span></div></div>
-    <div class="item"><div class="meta"></div><div class="content"><span class="value">{{ draws | default: "0" }}</span><span class="label">D</span></div></div>
-    <div class="item"><div class="meta"></div><div class="content"><span class="value">{{ losses | default: "0" }}</span><span class="label">L</span></div></div>
+    <div class="item"><div class="meta"></div><div class="content"><span class="value lg:value--xlarge pr--3">{{ wins | default: "0" }}</span><span class="label lg:label--base">W</span></div></div>
+    <div class="item"><div class="meta"></div><div class="content"><span class="value lg:value--xlarge pr--3">{{ draws | default: "0" }}</span><span class="label lg:label--base">D</span></div></div>
+    <div class="item"><div class="meta"></div><div class="content"><span class="value lg:value--xlarge pr--3">{{ losses | default: "0" }}</span><span class="label lg:label--base">L</span></div></div>
   </div>
 
   <div class="divider"></div>
 
   {% if last_result %}
   <div class="flex flex--col gap--tiny">
-    <span class="label label--underline">LAST RESULT</span>
-    <span class="value">
+    <span class="label label--underline lg:label--base">LAST RESULT</span>
+    <span class="value lg:value--large">
       [{{ last_result.outcome | default: "FT" }}] {% if last_result.is_home %}vs{% else %}@{% endif %} {{ last_result.opponent_abbr | default: last_result.opponent }} {{ last_result.score | default: "" }}
     </span>
   </div>
@@ -23,14 +23,14 @@
   {% endif %}
 
   <div class="flex flex--col gap--tiny">
-    <span class="label label--underline">UPCOMING</span>
+    <span class="label label--underline lg:label--base">UPCOMING</span>
     {% if next_game %}
-    <span class="value">
+    <span class="value lg:value--large">
       • {% if next_game.is_home %}vs{% else %}@{% endif %} {{ next_game.opponent_abbr | default: next_game.opponent }} ({{ next_game.date | default: "TBD" }})
     </span>
     {% endif %}
     {% if next_game_2 %}
-    <span class="value">
+    <span class="value lg:value--large">
       • {% if next_game_2.is_home %}vs{% else %}@{% endif %} {{ next_game_2.opponent_abbr | default: next_game_2.opponent }} ({{ next_game_2.date | default: "TBD" }})
     </span>
     {% endif %}
