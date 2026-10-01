@@ -1,15 +1,15 @@
 <div class="layout layout--col gap--space-between lg:gap--medium portrait:gap--tiny">
   <div class="flex flex--col gap--tiny">
     <span class="title title--small lg:title--large">{{ team_name | default: "MLS Team" }}</span>
-    <span class="label label--small lg:label--base">#{{ standing | default: "-" }} • {{ points | default: "0" }} pts • {{ wins | default: "0" }}W-{{ draws | default: "0" }}D-{{ losses | default: "0" }}L</span>
+    <span class="label label--small lg:label--large">#{{ standing | default: "-" }} • {{ points | default: "0" }} pts • {{ wins | default: "0" }}W-{{ draws | default: "0" }}D-{{ losses | default: "0" }}L</span>
   </div>
 
   <div class="divider"></div>
 
   {% if next_game %}
   <div class="flex flex--col gap--tiny">
-    <span class="label label--underline lg:label--base">NEXT MATCH</span>
-    <span class="value lg:value--medium">
+    <span class="label label--underline lg:label--large">NEXT MATCH</span>
+    <span class="value lg:value--base">
       {% if next_game.is_home %}vs{% else %}@{% endif %} {{ next_game.opponent_abbr | default: next_game.opponent }} • {{ next_game.date | default: "TBD" }}
     </span>
   </div>
