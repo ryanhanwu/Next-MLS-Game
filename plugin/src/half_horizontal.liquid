@@ -4,7 +4,7 @@
       <span class="title title--medium lg:title--xlarge">{{ team_name | default: "MLS Team" }}</span>
       <span class="label label--small lg:label--base">{{ conference | default: "MLS" }} #{{ standing | default: "-" }} • {{ points | default: "0" }} pts</span>
     </div>
-    <div class="flex gap--medium lg:gap--xlarge portrait:gap--small">
+    <div class="flex gap--medium lg:gap--xlarge portrait:gap--small lg:w--full">
       <div class="item"><div class="meta"></div><div class="content"><span class="value lg:value--xlarge pr--3">{{ wins | default: "0" }}</span><span class="label lg:label--base">W</span></div></div>
       <div class="item"><div class="meta"></div><div class="content"><span class="value lg:value--xlarge pr--3">{{ draws | default: "0" }}</span><span class="label lg:label--base">D</span></div></div>
       <div class="item"><div class="meta"></div><div class="content"><span class="value lg:value--xlarge pr--3">{{ losses | default: "0" }}</span><span class="label lg:label--base">L</span></div></div>
