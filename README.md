@@ -6,6 +6,14 @@ Each user picks their own team from a dropdown in the plugin settings. No code t
 
 ---
 
+## Install the Public Plugin
+
+This plugin is published as a public TRMNL recipe — install it directly, no setup or hosting required:
+
+👉 **[trmnl.com/recipes/485679](https://trmnl.com/recipes/485679)**
+
+---
+
 ## What It Shows
 
 ```
@@ -54,7 +62,9 @@ TRMNL polls → https://trmnl-mls-plugin.<subdomain>.workers.dev/mls?team={{ mls
 
 ---
 
-## Setup
+## Customize & Self-Host
+
+Want to tweak the layout or run your own copy? Skip this section if you just installed the [public plugin](#install-the-public-plugin) — it's only needed for self-hosting.
 
 ### 1. Clone and deploy the Worker
 
@@ -142,14 +152,6 @@ npm run dev          # Run Worker locally (Miniflare)
 npm run type-check   # TypeScript check
 npm run deploy       # Deploy manually to Cloudflare
 ```
-
----
-
-## Public Plugin
-
-This plugin is published as a public TRMNL recipe — install it directly, no setup or hosting required:
-
-👉 **[trmnl.com/recipes/485679](https://trmnl.com/recipes/485679)**
 
 ---
 
