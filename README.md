@@ -159,7 +159,7 @@ npm run deploy       # Deploy manually to Cloudflare
 
 - [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API) — community documentation of ESPN's undocumented public endpoints
   - [Soccer endpoints & league slugs](https://github.com/pseudo-r/Public-ESPN-API/blob/main/docs/sports/soccer.md) (MLS = `usa.1`)
-- [TRMNL Private Plugins docs](https://docs.usetrmnl.com)
+- [TRMNL Plugins docs](https://docs.usetrmnl.com)
 - [Cloudflare Workers docs](https://developers.cloudflare.com/workers/)
 
 ---
