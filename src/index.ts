@@ -4,9 +4,10 @@
  * GET /mls?team={team_name_or_id}
  *
  * Returns MLS team stats, conference standing, last result, and next 3 upcoming games.
+ * Uses public site-facing ESPN APIs (site.api.espn.com).
  */
 
-const CORE = "https://sports.core.api.espn.com/v2/sports/soccer/leagues/usa.1";
+const SITE_API = "https://site.api.espn.com";
 
 interface TeamMeta {
   name: string;
@@ -61,10 +62,18 @@ function resolveTeamId(param: string | null): string {
   const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
   const normalizedParam = normalize(trimmed);
 
-  const match = Object.entries(MLS_TEAMS_DATA).find(
-    ([, meta]) => normalize(meta.name) === normalizedParam
+  // 1. Exact name or abbreviation match
+  const exactMatch = Object.entries(MLS_TEAMS_DATA).find(
+    ([, meta]) => normalize(meta.name) === normalizedParam || normalize(meta.abbr) === normalizedParam
   );
-  if (match) return match[0];
+  if (exactMatch) return exactMatch[0];
+
+  // 2. Substring match
+  const partialMatch = Object.entries(MLS_TEAMS_DATA).find(
+    ([, meta]) => normalize(meta.name).includes(normalizedParam)
+  );
+  if (partialMatch) return partialMatch[0];
+
   return DEFAULT_TEAM_ID;
 }
 
@@ -74,7 +83,8 @@ async function get<T>(url: string): Promise<T> {
   const safeUrl = url.replace(/^http:\/\//, "https://");
   const res = await fetch(safeUrl, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; TRMNL-MLS-Plugin/1.0)",
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     },
   });
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${safeUrl}`);
@@ -119,8 +129,6 @@ async function getTeamData(teamId: string) {
     abbr: "MLS",
     conf: "East" as const,
   };
-  const groupId = teamMeta.conf === "West" ? "2" : "1";
-  const currentYear = new Date().getFullYear();
 
   let rank = "?";
   let points = "?";
@@ -128,156 +136,133 @@ async function getTeamData(teamId: string) {
   let losses = "?";
   let draws = "?";
   let record = "?";
+  let confName: string = teamMeta.conf;
 
-  // 1. Fetch conference standings for position, points, and W/D/L
-  try {
-    const standData = await get<any>(
-      `${CORE}/seasons/${currentYear}/types/1/groups/${groupId}/standings/0?lang=en&region=us`
-    );
-    const standings: any[] = standData.standings ?? [];
-    for (let i = 0; i < standings.length; i++) {
-      const it = standings[i];
-      if (it.team?.["$ref"]?.includes(`/teams/${teamId}`)) {
-        const rec = it.records?.[0];
-        const stats = Object.fromEntries(
-          (rec?.stats ?? []).map((s: any) => [s.name, s.displayValue])
-        );
-        rank = stats.rank ?? String(i + 1);
-        points = stats.points ?? "?";
-        wins = stats.wins ?? "?";
-        losses = stats.losses ?? "?";
-        draws = stats.ties ?? "?";
-        record = rec?.summary ?? `${wins}-${draws}-${losses}`;
-        break;
-      }
-    }
-  } catch (err) {
-    console.error("Standings fetch error:", err);
-  }
-
-  // 2. Fetch full schedule events (all 34 games) and find current window
   let lastResult: any = null;
   const nextGames: any[] = [];
 
-  try {
-    const evData = await get<any>(
-      `${CORE}/seasons/${currentYear}/types/1/teams/${teamId}/events?lang=en&region=us&limit=50`
-    );
-    const refs: string[] = (evData.items ?? []).map((i: any) => i["$ref"]);
+  // Fetch standings, past schedule, and upcoming fixtures concurrently
+  const [standingsRes, scheduleRes, fixturesRes] = await Promise.allSettled([
+    get<any>(`${SITE_API}/apis/v2/sports/soccer/usa.1/standings`),
+    get<any>(`${SITE_API}/apis/site/v2/sports/soccer/usa.1/teams/${teamId}/schedule`),
+    get<any>(`${SITE_API}/apis/site/v2/sports/soccer/usa.1/teams/${teamId}/schedule?fixture=true`),
+  ]);
 
-    if (refs.length > 0) {
-      const now = Date.now();
-      const eventCache = new Map<number, any>();
+  // 1. Process Standings
+  if (standingsRes.status === "fulfilled") {
+    try {
+      const standData = standingsRes.value;
+      for (const conf of standData.children || []) {
+        const cName = conf.name?.includes("Eastern")
+          ? "East"
+          : conf.name?.includes("Western")
+          ? "West"
+          : conf.name;
 
-      const fetchEventAt = async (idx: number) => {
-        if (eventCache.has(idx)) return eventCache.get(idx);
-        const ev = await get<any>(refs[idx]);
-        eventCache.set(idx, ev);
-        return ev;
-      };
-
-      // Binary search to find the index of the first upcoming match
-      let low = 0;
-      let high = refs.length - 1;
-      let firstUpcomingIdx = refs.length;
-
-      while (low <= high) {
-        const mid = Math.floor((low + high) / 2);
-        const ev = await fetchEventAt(mid);
-        const evTime = new Date(ev.date).getTime();
-        if (evTime >= now) {
-          firstUpcomingIdx = mid;
-          high = mid - 1;
-        } else {
-          low = mid + 1;
-        }
-      }
-
-      // Fetch Last Completed Game
-      const lastGameIdx = firstUpcomingIdx - 1;
-      if (lastGameIdx >= 0) {
-        try {
-          const lastEv = await fetchEventAt(lastGameIdx);
-          const comp = lastEv.competitions?.[0];
-          const comps: any[] = comp?.competitors ?? [];
-          const myComp = comps.find(
-            (c) => c.id === teamId || c.team?.["$ref"]?.includes(`/teams/${teamId}`)
-          );
-          const oppComp = comps.find(
-            (c) => c.id !== teamId && !c.team?.["$ref"]?.includes(`/teams/${teamId}`)
-          );
-          const oppMeta = (oppComp?.id && MLS_TEAMS_DATA[oppComp.id]) || {
-            name: lastEv.name ?? "Opponent",
-            abbr: "?",
-          };
-
-          // Fetch scores
-          let myScoreVal = "?";
-          let oppScoreVal = "?";
-          let outcome = "?";
-
-          if (myComp?.score?.["$ref"] && oppComp?.score?.["$ref"]) {
-            try {
-              const [myScoreData, oppScoreData] = await Promise.all([
-                get<any>(myComp.score["$ref"]),
-                get<any>(oppComp.score["$ref"]),
-              ]);
-              myScoreVal = String(myScoreData.value ?? myScoreData.displayValue ?? "?");
-              oppScoreVal = String(oppScoreData.value ?? oppScoreData.displayValue ?? "?");
-              const mNum = parseFloat(myScoreVal);
-              const oNum = parseFloat(oppScoreVal);
-              if (!isNaN(mNum) && !isNaN(oNum)) {
-                outcome = mNum > oNum ? "W" : mNum < oNum ? "L" : "D";
+        for (const entry of conf.standings?.entries || []) {
+          if (entry.team?.id === teamId) {
+            confName = cName;
+            const stats: Record<string, string> = {};
+            for (const s of entry.stats || []) {
+              stats[s.name] = String(s.displayValue ?? s.value ?? "");
+              if (s.name === "overall" || s.id === "0") {
+                stats.record = s.summary ?? s.displayValue;
               }
-            } catch {
-              // fallback
             }
+            rank = stats.rank ?? "?";
+            points = stats.points ?? "?";
+            wins = stats.wins ?? "?";
+            losses = stats.losses ?? "?";
+            draws = stats.ties ?? "?";
+            record = stats.record ?? `${wins}-${draws}-${losses}`;
+            break;
           }
-
-          lastResult = {
-            opponent: oppMeta.name,
-            opponent_abbr: oppMeta.abbr,
-            score: `${myScoreVal}-${oppScoreVal}`,
-            outcome,
-            date: formatDate(lastEv.date),
-            is_home: myComp?.homeAway === "home",
-          };
-        } catch (e) {
-          console.error("Last game parse error:", e);
         }
       }
-
-      // Fetch Next 3 Upcoming Games
-      for (let i = firstUpcomingIdx; i < Math.min(refs.length, firstUpcomingIdx + 3); i++) {
-        try {
-          const upEv = await fetchEventAt(i);
-          const comp = upEv.competitions?.[0];
-          const comps: any[] = comp?.competitors ?? [];
-          const myComp = comps.find(
-            (c) => c.id === teamId || c.team?.["$ref"]?.includes(`/teams/${teamId}`)
-          );
-          const oppComp = comps.find(
-            (c) => c.id !== teamId && !c.team?.["$ref"]?.includes(`/teams/${teamId}`)
-          );
-          const oppMeta = (oppComp?.id && MLS_TEAMS_DATA[oppComp.id]) || {
-            name: upEv.name ?? "Opponent",
-            abbr: "?",
-          };
-
-          nextGames.push({
-            opponent: oppMeta.name,
-            opponent_abbr: oppMeta.abbr,
-            date: formatDate(upEv.date),
-            time: formatTime(upEv.date),
-            is_home: myComp?.homeAway === "home",
-          });
-        } catch (e) {
-          console.error("Upcoming game parse error:", e);
-        }
-      }
+    } catch (err) {
+      console.error("Standings parse error:", err);
     }
-  } catch (err) {
-    console.error("Schedule fetch error:", err);
+  } else {
+    console.error("Standings fetch error:", standingsRes.reason);
+  }
+
+  // 2. Process Past Schedule (Last Completed Result)
+  if (scheduleRes.status === "fulfilled") {
+    try {
+      const schedData = scheduleRes.value;
+      const completedEvents = (schedData.events || []).filter((e: any) => {
+        const comp = e.competitions?.[0];
+        return comp?.status?.type?.completed || comp?.status?.type?.state === "post";
+      });
+
+      // Events are sorted newest first
+      const lastEv = completedEvents[0];
+      if (lastEv) {
+        const comp = lastEv.competitions?.[0];
+        const comps: any[] = comp?.competitors || [];
+        const myComp = comps.find((c) => c.id === teamId);
+        const oppComp = comps.find((c) => c.id !== teamId);
+        const oppMeta = (oppComp?.id && MLS_TEAMS_DATA[oppComp.id]) || {
+          name: oppComp?.team?.displayName || lastEv.name || "Opponent",
+          abbr: oppComp?.team?.abbreviation || "?",
+        };
+
+        const myScore = String(myComp?.score?.displayValue ?? myComp?.score?.value ?? "?");
+        const oppScore = String(oppComp?.score?.displayValue ?? oppComp?.score?.value ?? "?");
+
+        let outcome = "?";
+        if (myComp?.winner === true) outcome = "W";
+        else if (oppComp?.winner === true) outcome = "L";
+        else if (myScore !== "?" && oppScore !== "?" && myScore === oppScore) outcome = "D";
+
+        lastResult = {
+          opponent: oppMeta.name,
+          opponent_abbr: oppMeta.abbr,
+          score: `${myScore}-${oppScore}`,
+          outcome,
+          date: formatDate(lastEv.date),
+          is_home: myComp?.homeAway === "home",
+        };
+      }
+    } catch (err) {
+      console.error("Schedule parse error:", err);
+    }
+  } else {
+    console.error("Schedule fetch error:", scheduleRes.reason);
+  }
+
+  // 3. Process Fixtures (Next Upcoming Matches)
+  if (fixturesRes.status === "fulfilled") {
+    try {
+      const fixData = fixturesRes.value;
+      const upcomingEvents = (fixData.events || []).filter((e: any) => {
+        const comp = e.competitions?.[0];
+        return !comp?.status?.type?.completed && comp?.status?.type?.state !== "post";
+      });
+
+      for (const upEv of upcomingEvents.slice(0, 3)) {
+        const comp = upEv.competitions?.[0];
+        const comps: any[] = comp?.competitors || [];
+        const myComp = comps.find((c) => c.id === teamId);
+        const oppComp = comps.find((c) => c.id !== teamId);
+        const oppMeta = (oppComp?.id && MLS_TEAMS_DATA[oppComp.id]) || {
+          name: oppComp?.team?.displayName || upEv.name || "Opponent",
+          abbr: oppComp?.team?.abbreviation || "?",
+        };
+
+        nextGames.push({
+          opponent: oppMeta.name,
+          opponent_abbr: oppMeta.abbr,
+          date: formatDate(upEv.date),
+          time: formatTime(upEv.date),
+          is_home: myComp?.homeAway === "home",
+        });
+      }
+    } catch (err) {
+      console.error("Fixtures parse error:", err);
+    }
+  } else {
+    console.error("Fixtures fetch error:", fixturesRes.reason);
   }
 
   return {
@@ -288,7 +273,7 @@ async function getTeamData(teamId: string) {
     losses,
     draws,
     points,
-    conference: teamMeta.conf,
+    conference: confName,
     standing: rank,
     last_result: lastResult,
     next_game: nextGames[0] ?? null,
@@ -328,10 +313,15 @@ export default {
         merge_variables: data,
       };
 
+      const cacheHeader =
+        data.record === "?"
+          ? "no-store, no-cache"
+          : "public, max-age=1800";
+
       return new Response(JSON.stringify(responsePayload), {
         headers: {
           "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=1800",
+          "Cache-Control": cacheHeader,
         },
       });
     } catch (err: any) {
