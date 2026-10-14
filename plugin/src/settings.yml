@@ -72,9 +72,8 @@ custom_fields:
   field_type: author_bio
   category: sports
   name: About This Plugin
-  description: Track your favorite MLS team's standings, record, last match, and next 3 fixtures.
+  description: Track your favorite MLS team's standings, record, last match, and next 3 fixtures.<br><br>Stay connected to Major League Soccer right on your e-ink display. The MLS Team Tracker gives soccer supporters a clean, glanceable dashboard showing their favorite club&#39;s current standings, form, and match schedule.
   github_url: https://github.com/ryanhanwu/Next-MLS-Game
 name: Next MLS Game
 description: MLS team stats & upcoming games
-recipe_overview: Stay connected to Major League Soccer right on your e-ink display. The MLS Team Tracker gives soccer supporters a clean, glanceable dashboard showing their favorite club's current standings, form, and match schedule.
 refresh_interval: 60
