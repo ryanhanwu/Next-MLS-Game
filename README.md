@@ -145,11 +145,11 @@ npm run deploy       # Deploy manually to Cloudflare
 
 ---
 
-## Submitting to the TRMNL Marketplace
+## Public Plugin
 
-Once you're happy with the plugin, you can submit it as a **Recipe** to TRMNL:
-1. Export your plugin from TRMNL (Settings → Export)
-2. Submit via the [TRMNL Discord](https://discord.gg/trmnl) or community forum
+This plugin is published as a public TRMNL recipe — install it directly, no setup or hosting required:
+
+👉 **[trmnl.com/recipes/485679](https://trmnl.com/recipes/485679)**
 
 ---
 
