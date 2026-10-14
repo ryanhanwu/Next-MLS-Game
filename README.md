@@ -4,6 +4,8 @@ A [TRMNL](https://usetrmnl.com) plugin that shows your MLS team's current season
 
 Each user picks their own team from a dropdown in the plugin settings. No code to edit, no secrets to configure.
 
+
+
 ---
 
 ## Install the Public Plugin
@@ -11,6 +13,10 @@ Each user picks their own team from a dropdown in the plugin settings. No code t
 This plugin is published as a public TRMNL recipe — install it directly, no setup or hosting required:
 
 👉 **[trmnl.com/recipes/485679](https://trmnl.com/recipes/485679)**
+
+Thank you for using this plugin! 💛 It's a free, open-source hobby project, and every install, star, and bit of feedback genuinely means a lot. If it brings a little joy to your TRMNL (or helps you catch every match day), a coffee is always appreciated and helps keep it running:
+
+[![Buy Me a Coffee](https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=ryanhanwu&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff)](https://www.buymeacoffee.com/ryanhanwu)
 
 ---
 
