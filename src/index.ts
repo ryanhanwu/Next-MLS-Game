@@ -5,8 +5,28 @@
  *
  * Returns MLS team stats, conference standing, last result, and next 3 upcoming games.
  * Uses public site-facing ESPN APIs (site.api.espn.com).
+ *
+ * ── Data sources (ESPN Site API, league slug `usa.1` = MLS) ──────────────────
+ *   1. Standings (conference rank, W/D/L, points, record)
+ *        GET https://site.api.espn.com/apis/v2/sports/soccer/usa.1/standings
+ *        Note: use `/apis/v2/` — `/apis/site/v2/.../standings` only returns a stub.
+ *   2. Team schedule — completed matches, newest first (used for last result)
+ *        GET https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/teams/{id}/schedule
+ *   3. Team fixtures — upcoming matches, soonest first (used for next 3 games)
+ *        GET https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/teams/{id}/schedule?fixture=true
+ *
+ * ── Why not the Core API? ────────────────────────────────────────────────────
+ *   `sports.core.api.espn.com` returns 403 Forbidden to requests from Cloudflare
+ *   Workers, and it needs many chained `$ref` lookups. The Site API works from
+ *   Workers and returns everything we need in 3 parallel requests.
+ *
+ * ── Reference ────────────────────────────────────────────────────────────────
+ *   Unofficial ESPN endpoint docs: https://github.com/pseudo-r/Public-ESPN-API
+ *   (soccer: https://github.com/pseudo-r/Public-ESPN-API/blob/main/docs/sports/soccer.md)
+ *   These endpoints are undocumented and may change without notice.
  */
 
+/** Base URL for ESPN's public site-facing API. */
 const SITE_API = "https://site.api.espn.com";
 
 interface TeamMeta {
@@ -79,6 +99,10 @@ function resolveTeamId(param: string | null): string {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * Fetch JSON from an ESPN endpoint. Sends a browser-like User-Agent, since ESPN
+ * may reject default/unknown agents. Throws on any non-2xx response.
+ */
 async function get<T>(url: string): Promise<T> {
   const safeUrl = url.replace(/^http:\/\//, "https://");
   const res = await fetch(safeUrl, {
@@ -141,7 +165,11 @@ async function getTeamData(teamId: string) {
   let lastResult: any = null;
   const nextGames: any[] = [];
 
-  // Fetch standings, past schedule, and upcoming fixtures concurrently
+  // Fetch standings, past schedule, and upcoming fixtures concurrently.
+  // All three are ESPN Site API endpoints (see header comment / Public-ESPN-API docs):
+  //   [0] /apis/v2/.../usa.1/standings                       → conference tables (both East & West)
+  //   [1] /apis/site/v2/.../usa.1/teams/{id}/schedule        → completed matches, newest first
+  //   [2] /apis/site/v2/.../usa.1/teams/{id}/schedule?fixture=true → upcoming matches, soonest first
   const [standingsRes, scheduleRes, fixturesRes] = await Promise.allSettled([
     get<any>(`${SITE_API}/apis/v2/sports/soccer/usa.1/standings`),
     get<any>(`${SITE_API}/apis/site/v2/sports/soccer/usa.1/teams/${teamId}/schedule`),

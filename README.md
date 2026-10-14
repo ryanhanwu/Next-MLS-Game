@@ -29,14 +29,28 @@ Each user picks their own team from a dropdown in the plugin settings. No code t
 ```
 TRMNL polls → https://trmnl-mls-plugin.<subdomain>.workers.dev/mls?team={{ mls_team_id }}
                   ↓
-          Cloudflare Worker fetches ESPN API (parallel)
+          Cloudflare Worker fetches 3 ESPN Site API endpoints in parallel
                   ↓
           Returns merge_variables JSON → TRMNL renders Liquid template
 ```
 
-- **Data source:** ESPN's internal API (`site.api.espn.com`) — unofficial but stable, no API key needed
+- **Data source:** ESPN's public Site API (`site.api.espn.com`, league `usa.1`) — unofficial but stable, no API key needed
 - **Server:** Cloudflare Worker (free tier: 100k req/day)
 - **Deploy:** GitHub Actions on push to `main`
+
+### ESPN endpoints used
+
+| Purpose | Endpoint |
+|---|---|
+| Standings (conference rank, record, points) | `GET https://site.api.espn.com/apis/v2/sports/soccer/usa.1/standings` |
+| Last result (completed matches, newest first) | `GET https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/teams/{id}/schedule` |
+| Next 3 fixtures (upcoming matches) | `GET https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/teams/{id}/schedule?fixture=true` |
+
+> **Note:** Standings must use `/apis/v2/` — `/apis/site/v2/.../standings` only returns a stub.
+>
+> The ESPN Core API (`sports.core.api.espn.com`) is **not** used: it returns `403 Forbidden` to requests from Cloudflare Workers and requires many chained `$ref` lookups.
+>
+> These endpoints are undocumented and may change without notice. See [References](#references).
 
 ---
 
@@ -136,6 +150,15 @@ npm run deploy       # Deploy manually to Cloudflare
 Once you're happy with the plugin, you can submit it as a **Recipe** to TRMNL:
 1. Export your plugin from TRMNL (Settings → Export)
 2. Submit via the [TRMNL Discord](https://discord.gg/trmnl) or community forum
+
+---
+
+## References
+
+- [pseudo-r/Public-ESPN-API](https://github.com/pseudo-r/Public-ESPN-API) — community documentation of ESPN's undocumented public endpoints
+  - [Soccer endpoints & league slugs](https://github.com/pseudo-r/Public-ESPN-API/blob/main/docs/sports/soccer.md) (MLS = `usa.1`)
+- [TRMNL Private Plugins docs](https://docs.usetrmnl.com)
+- [Cloudflare Workers docs](https://developers.cloudflare.com/workers/)
 
 ---
 
