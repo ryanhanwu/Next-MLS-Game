@@ -263,10 +263,23 @@ async function getTeamData(teamId: string) {
   if (fixturesRes.status === "fulfilled") {
     try {
       const fixData = fixturesRes.value;
-      const upcomingEvents = (fixData.events || []).filter((e: any) => {
-        const comp = e.competitions?.[0];
-        return !comp?.status?.type?.completed && comp?.status?.type?.state !== "post";
-      });
+
+      // `?fixture=true` rolls over to NEXT season's fixtures once the current
+      // season's schedule is finished (e.g. in late Oct it returns Feb–May of the
+      // following year). Those would show up as "upcoming" with no year, which is
+      // misleading, so only accept fixtures from the same season as the schedule
+      // endpoint. If either season year is unknown, skip the check.
+      const scheduleYear =
+        scheduleRes.status === "fulfilled" ? scheduleRes.value?.requestedSeason?.year : undefined;
+      const fixtureYear = fixData?.requestedSeason?.year;
+      const sameSeason = !scheduleYear || !fixtureYear || scheduleYear === fixtureYear;
+
+      const upcomingEvents = !sameSeason
+        ? []
+        : (fixData.events || []).filter((e: any) => {
+            const comp = e.competitions?.[0];
+            return !comp?.status?.type?.completed && comp?.status?.type?.state !== "post";
+          });
 
       for (const upEv of upcomingEvents.slice(0, 3)) {
         const comp = upEv.competitions?.[0];
