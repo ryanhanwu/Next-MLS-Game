@@ -145,6 +145,54 @@ function formatUpdatedAt(): string {
   });
 }
 
+function parseGameItem(ev: any, teamId: string) {
+  const comp = ev.competitions?.[0];
+  const comps: any[] = comp?.competitors || [];
+  const myComp = comps.find((c) => c.id === teamId);
+  const oppComp = comps.find((c) => c.id !== teamId);
+  const oppMeta = (oppComp?.id && MLS_TEAMS_DATA[oppComp.id]) || {
+    name: oppComp?.team?.displayName || ev.name || "Opponent",
+    abbr: oppComp?.team?.abbreviation || "?",
+  };
+
+  return {
+    opponent: oppMeta.name,
+    opponent_abbr: oppMeta.abbr,
+    date: formatDate(ev.date),
+    time: formatTime(ev.date),
+    is_home: myComp?.homeAway === "home",
+  };
+}
+
+function parseResultItem(ev: any, teamId: string) {
+  const comp = ev.competitions?.[0];
+  const comps: any[] = comp?.competitors || [];
+  const myComp = comps.find((c) => c.id === teamId);
+  const oppComp = comps.find((c) => c.id !== teamId);
+  const oppMeta = (oppComp?.id && MLS_TEAMS_DATA[oppComp.id]) || {
+    name: oppComp?.team?.displayName || ev.name || "Opponent",
+    abbr: oppComp?.team?.abbreviation || "?",
+  };
+
+  const myScore = String(myComp?.score?.displayValue ?? myComp?.score?.value ?? "?");
+  const oppScore = String(oppComp?.score?.displayValue ?? oppComp?.score?.value ?? "?");
+
+  let outcome = "?";
+  if (myComp?.winner === true) outcome = "W";
+  else if (oppComp?.winner === true) outcome = "L";
+  else if (myScore !== "?" && oppScore !== "?" && myScore === oppScore) outcome = "D";
+
+  return {
+    opponent: oppMeta.name,
+    opponent_abbr: oppMeta.abbr,
+    score: `${myScore}-${oppScore}`,
+    outcome,
+    date: formatDate(ev.date),
+    is_home: myComp?.homeAway === "home",
+    raw_date: ev.date,
+  };
+}
+
 // ── Data Fetcher ──────────────────────────────────────────────────────────────
 
 async function getTeamData(teamId: string) {
@@ -165,15 +213,17 @@ async function getTeamData(teamId: string) {
   let lastResult: any = null;
   const nextGames: any[] = [];
 
-  // Fetch standings, past schedule, and upcoming fixtures concurrently.
-  // All three are ESPN Site API endpoints (see header comment / Public-ESPN-API docs):
+  // Fetch standings, past schedule, upcoming fixtures, and team info concurrently.
+  // All are ESPN Site API endpoints:
   //   [0] /apis/v2/.../usa.1/standings                       → conference tables (both East & West)
   //   [1] /apis/site/v2/.../usa.1/teams/{id}/schedule        → completed matches, newest first
-  //   [2] /apis/site/v2/.../usa.1/teams/{id}/schedule?fixture=true → upcoming matches, soonest first
-  const [standingsRes, scheduleRes, fixturesRes] = await Promise.allSettled([
+  //   [2] /apis/site/v2/.../usa.1/teams/{id}/schedule?fixture=true → regular season upcoming fixtures
+  //   [3] /apis/site/v2/.../usa.1/teams/{id}                 → team details & active nextEvent (e.g. playoffs)
+  const [standingsRes, scheduleRes, fixturesRes, teamRes] = await Promise.allSettled([
     get<any>(`${SITE_API}/apis/v2/sports/soccer/usa.1/standings`),
     get<any>(`${SITE_API}/apis/site/v2/sports/soccer/usa.1/teams/${teamId}/schedule`),
     get<any>(`${SITE_API}/apis/site/v2/sports/soccer/usa.1/teams/${teamId}/schedule?fixture=true`),
+    get<any>(`${SITE_API}/apis/site/v2/sports/soccer/usa.1/teams/${teamId}`),
   ]);
 
   // 1. Process Standings
@@ -226,31 +276,7 @@ async function getTeamData(teamId: string) {
       // Events are sorted newest first
       const lastEv = completedEvents[0];
       if (lastEv) {
-        const comp = lastEv.competitions?.[0];
-        const comps: any[] = comp?.competitors || [];
-        const myComp = comps.find((c) => c.id === teamId);
-        const oppComp = comps.find((c) => c.id !== teamId);
-        const oppMeta = (oppComp?.id && MLS_TEAMS_DATA[oppComp.id]) || {
-          name: oppComp?.team?.displayName || lastEv.name || "Opponent",
-          abbr: oppComp?.team?.abbreviation || "?",
-        };
-
-        const myScore = String(myComp?.score?.displayValue ?? myComp?.score?.value ?? "?");
-        const oppScore = String(oppComp?.score?.displayValue ?? oppComp?.score?.value ?? "?");
-
-        let outcome = "?";
-        if (myComp?.winner === true) outcome = "W";
-        else if (oppComp?.winner === true) outcome = "L";
-        else if (myScore !== "?" && oppScore !== "?" && myScore === oppScore) outcome = "D";
-
-        lastResult = {
-          opponent: oppMeta.name,
-          opponent_abbr: oppMeta.abbr,
-          score: `${myScore}-${oppScore}`,
-          outcome,
-          date: formatDate(lastEv.date),
-          is_home: myComp?.homeAway === "home",
-        };
+        lastResult = parseResultItem(lastEv, teamId);
       }
     } catch (err) {
       console.error("Schedule parse error:", err);
@@ -259,16 +285,15 @@ async function getTeamData(teamId: string) {
     console.error("Schedule fetch error:", scheduleRes.reason);
   }
 
-  // 3. Process Fixtures (Next Upcoming Matches)
+  // 3. Process Fixtures (Next Upcoming Matches - Regular Season)
   if (fixturesRes.status === "fulfilled") {
     try {
       const fixData = fixturesRes.value;
 
       // `?fixture=true` rolls over to NEXT season's fixtures once the current
       // season's schedule is finished (e.g. in late Oct it returns Feb–May of the
-      // following year). Those would show up as "upcoming" with no year, which is
-      // misleading, so only accept fixtures from the same season as the schedule
-      // endpoint. If either season year is unknown, skip the check.
+      // following year). Only accept fixtures from the same season as the schedule
+      // endpoint.
       const scheduleYear =
         scheduleRes.status === "fulfilled" ? scheduleRes.value?.requestedSeason?.year : undefined;
       const fixtureYear = fixData?.requestedSeason?.year;
@@ -282,28 +307,110 @@ async function getTeamData(teamId: string) {
           });
 
       for (const upEv of upcomingEvents.slice(0, 3)) {
-        const comp = upEv.competitions?.[0];
-        const comps: any[] = comp?.competitors || [];
-        const myComp = comps.find((c) => c.id === teamId);
-        const oppComp = comps.find((c) => c.id !== teamId);
-        const oppMeta = (oppComp?.id && MLS_TEAMS_DATA[oppComp.id]) || {
-          name: oppComp?.team?.displayName || upEv.name || "Opponent",
-          abbr: oppComp?.team?.abbreviation || "?",
-        };
-
-        nextGames.push({
-          opponent: oppMeta.name,
-          opponent_abbr: oppMeta.abbr,
-          date: formatDate(upEv.date),
-          time: formatTime(upEv.date),
-          is_home: myComp?.homeAway === "home",
-        });
+        nextGames.push(parseGameItem(upEv, teamId));
       }
     } catch (err) {
       console.error("Fixtures parse error:", err);
     }
   } else {
     console.error("Fixtures fetch error:", fixturesRes.reason);
+  }
+
+  // 4. Process Playoff Matches (when regular season has ended or fixtures are empty)
+  if (nextGames.length === 0 && teamRes.status === "fulfilled") {
+    try {
+      const teamData = teamRes.value?.team;
+      const nextEv = teamData?.nextEvent?.[0];
+      const scheduleYear =
+        scheduleRes.status === "fulfilled" ? scheduleRes.value?.requestedSeason?.year : undefined;
+
+      // Check if nextEvent belongs to the current season/playoffs:
+      // Either event year matches scheduleYear, or seasonType indicates postseason/playoffs
+      const isCurrentPlayoff =
+        nextEv &&
+        (new Date(nextEv.date).getFullYear() === scheduleYear ||
+          /playoff|postseason|cup/i.test(nextEv.seasonType?.name ?? ""));
+
+      if (isCurrentPlayoff) {
+        const d = new Date(nextEv.date);
+        const ym1 = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const nextMonthDate = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+        const ym2 = `${nextMonthDate.getFullYear()}${String(nextMonthDate.getMonth() + 1).padStart(2, "0")}`;
+
+        const [sb1, sb2] = await Promise.allSettled([
+          get<any>(`${SITE_API}/apis/site/v2/sports/soccer/usa.1/scoreboard?dates=${ym1}`),
+          get<any>(`${SITE_API}/apis/site/v2/sports/soccer/usa.1/scoreboard?dates=${ym2}`),
+        ]);
+
+        const allEvents: any[] = [
+          ...(sb1.status === "fulfilled" ? sb1.value?.events || [] : []),
+          ...(sb2.status === "fulfilled" ? sb2.value?.events || [] : []),
+        ];
+
+        const now = new Date().toISOString();
+
+        // Check if there are any completed playoff matches newer than lastResult
+        const completedPlayoffEvents = allEvents.filter((e: any) => {
+          const comp = e.competitions?.[0];
+          const isTeam = comp?.competitors?.some((c: any) => c.id === teamId);
+          const isCompleted = comp?.status?.type?.completed || comp?.status?.type?.state === "post";
+          return isTeam && isCompleted;
+        });
+
+        if (completedPlayoffEvents.length > 0) {
+          completedPlayoffEvents.sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+          );
+          const newest = completedPlayoffEvents[0];
+          if (
+            !lastResult ||
+            !lastResult.raw_date ||
+            new Date(newest.date).getTime() > new Date(lastResult.raw_date).getTime()
+          ) {
+            lastResult = parseResultItem(newest, teamId);
+          }
+        }
+
+        // Upcoming playoff matches
+        const teamUpcomingEvents = allEvents.filter((e: any) => {
+          const comp = e.competitions?.[0];
+          const isTeam = comp?.competitors?.some((c: any) => c.id === teamId);
+          const isUpcoming =
+            comp?.status?.type?.state !== "post" && !comp?.status?.type?.completed && e.date >= now;
+          return isTeam && isUpcoming;
+        });
+
+        // Deduplicate and sort by date ascending
+        const seen = new Set<string>();
+        const uniqueUpcoming: any[] = [];
+        for (const e of teamUpcomingEvents.sort(
+          (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+        )) {
+          if (!seen.has(e.id)) {
+            seen.add(e.id);
+            uniqueUpcoming.push(e);
+          }
+        }
+
+        if (uniqueUpcoming.length > 0) {
+          for (const ev of uniqueUpcoming.slice(0, 3)) {
+            nextGames.push(parseGameItem(ev, teamId));
+          }
+        } else {
+          // Fallback to nextEv directly if scoreboard didn't catch it
+          nextGames.push(parseGameItem(nextEv, teamId));
+        }
+      }
+    } catch (err) {
+      console.error("Playoffs parse error:", err);
+    }
+  }
+
+  // Strip raw_date from lastResult
+  let cleanedLastResult = null;
+  if (lastResult) {
+    const { raw_date, ...rest } = lastResult;
+    cleanedLastResult = rest;
   }
 
   return {
@@ -316,13 +423,13 @@ async function getTeamData(teamId: string) {
     points,
     conference: confName,
     standing: rank,
-    last_result: lastResult,
+    last_result: cleanedLastResult,
     next_game: nextGames[0] ?? null,
     next_game_2: nextGames[1] ?? null,
     next_game_3: nextGames[2] ?? null,
     next_games: nextGames,
     no_upcoming: nextGames.length === 0,
-    season_complete: nextGames.length === 0 && lastResult !== null,
+    season_complete: nextGames.length === 0 && cleanedLastResult !== null,
     updated_at: formatUpdatedAt(),
   };
 }
