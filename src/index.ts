@@ -372,12 +372,16 @@ async function getTeamData(teamId: string) {
         }
 
         // Upcoming playoff matches
+        // ESPN pre-creates "if necessary" games (e.g. Game 3 of a Best-of-3 series)
+        // as placeholders with `timeValid: false` and a "TBD" status. They are not
+        // confirmed fixtures, so skip them until ESPN assigns a real kickoff time.
         const teamUpcomingEvents = allEvents.filter((e: any) => {
           const comp = e.competitions?.[0];
           const isTeam = comp?.competitors?.some((c: any) => c.id === teamId);
           const isUpcoming =
             comp?.status?.type?.state !== "post" && !comp?.status?.type?.completed && e.date >= now;
-          return isTeam && isUpcoming;
+          const isConfirmed = comp?.timeValid !== false;
+          return isTeam && isUpcoming && isConfirmed;
         });
 
         // Deduplicate and sort by date ascending
@@ -396,7 +400,7 @@ async function getTeamData(teamId: string) {
           for (const ev of uniqueUpcoming.slice(0, 3)) {
             nextGames.push(parseGameItem(ev, teamId));
           }
-        } else {
+        } else if (nextEv.competitions?.[0]?.timeValid !== false) {
           // Fallback to nextEv directly if scoreboard didn't catch it
           nextGames.push(parseGameItem(nextEv, teamId));
         }
